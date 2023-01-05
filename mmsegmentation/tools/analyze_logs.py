@@ -12,7 +12,8 @@ import seaborn as sns
 def plot_curve(log_dicts, args):
     if args.backend is not None:
         plt.switch_backend(args.backend)
-    sns.set_style(args.style)
+    # sns.set_style(args.style)
+    sns.set_theme(style="darkgrid")
     # if legend is None, use {filename}_{key} as legend
     legend = args.legend
     if legend is None:
@@ -68,28 +69,29 @@ def plot_curve(log_dicts, args):
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Analyze Json Log')
-    parser.add_argument(
-        'json_logs',
-        type=str,
-        nargs='+',
-        help='path of train log in json format')
-    parser.add_argument(
-        '--keys',
-        type=str,
-        nargs='+',
-        default=['mIoU'],
-        help='the metric that you want to plot')
+    parser.add_argument('json_logs',
+                        type=str,
+                        nargs='+',
+                        help='path of train log in json format')
+    parser.add_argument('--keys',
+                        type=str,
+                        nargs='+',
+                        default=['mIoU'],
+                        help='the metric that you want to plot')
     parser.add_argument('--title', type=str, help='title of figure')
-    parser.add_argument(
-        '--legend',
-        type=str,
-        nargs='+',
-        default=None,
-        help='legend of each plot')
-    parser.add_argument(
-        '--backend', type=str, default=None, help='backend of plt')
-    parser.add_argument(
-        '--style', type=str, default='dark', help='style of plt')
+    parser.add_argument('--legend',
+                        type=str,
+                        nargs='+',
+                        default=None,
+                        help='legend of each plot')
+    parser.add_argument('--backend',
+                        type=str,
+                        default=None,
+                        help='backend of plt')
+    parser.add_argument('--style',
+                        type=str,
+                        default='dark',
+                        help='style of plt')
     parser.add_argument('--out', type=str, default=None)
     args = parser.parse_args()
     return args
@@ -102,8 +104,12 @@ def load_json_logs(json_logs):
     log_dicts = [dict() for _ in json_logs]
     for json_log, log_dict in zip(json_logs, log_dicts):
         with open(json_log, 'r') as log_file:
-            for line in log_file:
-                log = json.loads(line.strip())
+            data = json.load(log_file)
+            log_file = data["result"]
+            # for line in log_file:
+            for log in log_file:
+                # print(line)
+                # log = json.loads(line.strip())
                 # skip lines without `epoch` field
                 if 'epoch' not in log:
                     continue

@@ -135,7 +135,12 @@ def show_result_pyplot(model,
     if hasattr(model, 'module'):
         model = model.module
     img = model.show_result(
-        img, result, palette=palette, show=False, opacity=opacity)
+        img,
+        result,
+        palette=palette,
+        show=False,
+        opacity=opacity,
+        out_file=out_file)
     plt.figure(figsize=fig_size)
     plt.imshow(mmcv.bgr2rgb(img))
     plt.title(title)

@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 import mmcv
 import numpy as np
-from mmcv.utils import print_log
+from mmcv.utils import print_log, get_logger
 from prettytable import PrettyTable
 from torch.utils.data import Dataset
 
@@ -13,6 +13,8 @@ from mmseg.core import eval_metrics, intersect_and_union, pre_eval_to_metrics
 from mmseg.utils import get_root_logger
 from .builder import DATASETS
 from .pipelines import Compose, LoadAnnotations
+
+logger = get_root_logger()
 
 
 @DATASETS.register_module()
@@ -103,6 +105,8 @@ class CustomDataset(Dataset):
         self.ignore_index = ignore_index
         self.reduce_zero_label = reduce_zero_label
         self.label_map = None
+        print(f"\nLabel map __init__ {self.label_map}")
+
         self.CLASSES, self.PALETTE = self.get_classes_and_palette(
             classes, palette)
         self.gt_seg_map_loader = LoadAnnotations(
@@ -153,8 +157,8 @@ class CustomDataset(Dataset):
 
         img_infos = []
         if split is not None:
-            lines = mmcv.list_from_file(
-                split, file_client_args=self.file_client_args)
+            lines = mmcv.list_from_file(split,
+                                        file_client_args=self.file_client_args)
             for line in lines:
                 img_name = line.strip()
                 img_info = dict(filename=img_name + img_suffix)
@@ -163,11 +167,10 @@ class CustomDataset(Dataset):
                     img_info['ann'] = dict(seg_map=seg_map)
                 img_infos.append(img_info)
         else:
-            for img in self.file_client.list_dir_or_file(
-                    dir_path=img_dir,
-                    list_dir=False,
-                    suffix=img_suffix,
-                    recursive=True):
+            for img in self.file_client.list_dir_or_file(dir_path=img_dir,
+                                                         list_dir=False,
+                                                         suffix=img_suffix,
+                                                         recursive=True):
                 img_info = dict(filename=img)
                 if ann_dir is not None:
                     seg_map = img.replace(img_suffix, seg_map_suffix)
@@ -362,8 +365,8 @@ class CustomDataset(Dataset):
         if self.label_map is not None:
             # return subset of palette
             palette = []
-            for old_id, new_id in sorted(
-                    self.label_map.items(), key=lambda x: x[1]):
+            for old_id, new_id in sorted(self.label_map.items(),
+                                         key=lambda x: x[1]):
                 if new_id != -1:
                     palette.append(self.PALETTE[old_id])
             palette = type(self.PALETTE)(palette)
