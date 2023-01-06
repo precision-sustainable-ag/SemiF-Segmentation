@@ -75,13 +75,13 @@ class_id 0 is background.
 [PSA Classes](mmsegmentation/mmseg/core/evaluation/class_names.py#L129)  
 [PSA Palette](mmsegmentation/mmseg/core/evaluation/class_names.py#L141)
 
+<br>
 
-## TODOs:
+---
 
-1. Find dataset means and std
+<br>
 
-
-## Git subtree commands
+# Git subtree commands
 
 
 ### 1. Add subtree
@@ -102,10 +102,11 @@ git subtree pull --prefix mmsegmentation git@github.com:open-mmlab/mmsegmentatio
 ## Contributing back upstream 
 We can freely commit our fixes to the sub-project in our local working directory now. When it’s time to contribute back to the upstream project, we need to fork the project and add it as another remote:
 
-
+```
 git remote add mmsegmentation ssh://git@bitbucket.org/durdn/vim-surround.git
+```
 
-
+# Not sure what these do, not working for me. 
 git fetch mmsegmentation master
 git subtree pull --prefix mmsegmentation master --squash
 
