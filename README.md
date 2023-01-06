@@ -5,14 +5,21 @@ SemiF-Segmentation is a repository for training semantic segmentation models usi
 In this repository, you will find a collection of data curation tools and approaches that are specifically designed for preparing and organizing agricultural image data, in particular the PSA SemiField-Image repository. In addition to these tools, we use [MMSegmentation](https://github.com/open-mmlab/mmsegmentation) and their range of model architectures for training. We also provide examples and tutorials on how to use our tools and resources to solve challenging tasks in the field of agriculture, such as multispecies weed segementation.
 
 
-
-
 ### Table of Contents  
 [Setup](#setup)  
 [Classes](#classes)  
 [Git subtree commands](#git-subtree-commands)  
 
 <br>
+
+
+<div style="width: 100%; height: 100%">
+
+![](figures/goose.png)
+  
+</div>
+
+
 
 ## Setup
 
