@@ -1,5 +1,11 @@
 # SemiF-Segmentation
-SemiF-Segmentation provides a toolbox for developing models aimed at segmenting agronomically relevant plant images. This repo places an emphasis on data curation rather than archeticture development. We use [MMSegmentation](https://github.com/open-mmlab/mmsegmentation) to apply the latest CNN and transformer approaches.
+
+SemiF-Segmentation is a repository for training semantic segmentation models using agronomically relevant plant images! This repository is intended for scientific researchers and technical experts who are interested in using machine learning techniques to segment weeds, crops, and cover crops in agricultural images. 
+
+In this repository, you will find a collection of data curation tools and approaches that are specifically designed for preparing and organizing agricultural image data, in particular the PSA SemiField-Image repository. In addition to these tools, we use [MMSegmentation](https://github.com/open-mmlab/mmsegmentation) and their range of model architectures for training. We also provide examples and tutorials on how to use our tools and resources to solve challenging tasks in the field of agriculture, such as multispecies weed segementation.
+
+
+
 
 ### Table of Contents  
 [Setup](#setup)  
