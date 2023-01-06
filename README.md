@@ -1,10 +1,10 @@
 # SemiF-Segmentation
 SemiF-Segmentation provides a toolbox for developing models aimed at segmenting agronomically relevant plant images. This repo places an emphasis on data curation rather than archeticture development. We use [MMSegmentation](https://github.com/open-mmlab/mmsegmentation) to apply the latest CNN and transformer approaches.
 
-## Table of Contents  
-### [Setup](#setup)  
-### [Classes](#classes)  
-### [Viz](#viz)
+### Table of Contents  
+[Setup](#setup)  
+[Classes](#classes)  
+[Git subtree commands](#git-subtree-commands)  
 
 <br>
 
@@ -39,6 +39,10 @@ mkdir data
 
 class_id 0 is background.
 
+[PSA Classes](mmsegmentation/mmseg/core/evaluation/class_names.py#L129)  
+
+[PSA Palette](mmsegmentation/mmseg/core/evaluation/class_names.py#L141)
+
 ### Class Format Example (Palmer amaranth)
 ```json
 "AMPA": {
@@ -70,18 +74,11 @@ class_id 0 is background.
 }
 ```
 
-## Viz
-
-[PSA Classes](mmsegmentation/mmseg/core/evaluation/class_names.py#L129)  
-[PSA Palette](mmsegmentation/mmseg/core/evaluation/class_names.py#L141)
 
 <br>
 
----
 
-<br>
-
-# Git subtree commands
+## [Git subtree commands](https://www.atlassian.com/git/tutorials/git-subtree)
 
 
 ### 1. Add subtree
@@ -89,24 +86,25 @@ class_id 0 is background.
 git subtree add --prefix mmsegmentation git@github.com:open-mmlab/mmsegmentation.git master --squash
 ```
 
-# 2. Add remote
+### 2. Add remote
 ```
 git remote add -f mmsegmentation git@github.com:open-mmlab/mmsegmentation.git
 ```
 
-# 3. Update subtree
+### 3. Update subtree
 ```
 git subtree pull --prefix mmsegmentation git@github.com:open-mmlab/mmsegmentation.git master --squash
 ```
 
-## Contributing back upstream 
+### 4. Contributing back upstream 
 We can freely commit our fixes to the sub-project in our local working directory now. When it’s time to contribute back to the upstream project, we need to fork the project and add it as another remote:
 
 ```
 git remote add mmsegmentation ssh://git@bitbucket.org/durdn/vim-surround.git
 ```
 
-# Not sure what these do, not working for me. 
+#### Not sure what these do, not working for me. 
+```
 git fetch mmsegmentation master
 git subtree pull --prefix mmsegmentation master --squash
-
+```
