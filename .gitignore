@@ -1,6 +1,9 @@
 # MMSegmentation
 # mmsegmentation
-
+all_*
+assets
+checkpoints
+output
 # Byte-compiled / optimized / DLL files
 __pycache__/
 

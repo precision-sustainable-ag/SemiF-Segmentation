@@ -1,3 +1,15 @@
+# custom
+*.pkl
+*.pkl.json
+*.log.json
+work_dirs/
+mmseg/.mim
+data
+all_*
+assets
+checkpoints
+output
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -105,16 +117,10 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-data
+
 .vscode
 .idea
 
-# custom
-*.pkl
-*.pkl.json
-*.log.json
-work_dirs/
-mmseg/.mim
 
 # Pytorch
 *.pth
