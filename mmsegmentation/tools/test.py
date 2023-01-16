@@ -15,7 +15,7 @@ from mmcv.utils import DictAction
 
 import sys
 
-sys.path.append("/home/mkutuga/mmsegmentation")
+sys.path.append("/home/mkutuga/SemiF-Segmentation/mmsegmentation")
 
 from mmseg import digit_version
 from mmseg.apis import multi_gpu_test, single_gpu_test
@@ -33,9 +33,8 @@ def parse_args():
         '--work-dir',
         help=('if specified, the evaluation metric results will be dumped'
               'into the directory as json'))
-    parser.add_argument('--aug-test',
-                        action='store_true',
-                        help='Use Flip and Multi scale aug')
+    parser.add_argument(
+        '--aug-test', action='store_true', help='Use Flip and Multi scale aug')
     parser.add_argument('--out', help='output result file in pickle format')
     parser.add_argument(
         '--format-only',
@@ -50,16 +49,18 @@ def parse_args():
         help='evaluation metrics, which depends on the dataset, e.g., "mIoU"'
         ' for generic datasets, and "cityscapes" for Cityscapes')
     parser.add_argument('--show', action='store_true', help='show results')
-    parser.add_argument('--show-dir',
-                        help='directory where painted images will be saved')
-    parser.add_argument('--gpu-collect',
-                        action='store_true',
-                        help='whether to use gpu to collect results.')
-    parser.add_argument('--gpu-id',
-                        type=int,
-                        default=0,
-                        help='id of gpu to use '
-                        '(only applicable to non-distributed testing)')
+    parser.add_argument(
+        '--show-dir', help='directory where painted images will be saved')
+    parser.add_argument(
+        '--gpu-collect',
+        action='store_true',
+        help='whether to use gpu to collect results.')
+    parser.add_argument(
+        '--gpu-id',
+        type=int,
+        default=0,
+        help='id of gpu to use '
+        '(only applicable to non-distributed testing)')
     parser.add_argument(
         '--tmpdir',
         help='tmp directory used for collecting results from multiple '
@@ -85,14 +86,16 @@ def parse_args():
         'It also allows nested list/tuple values, e.g. key="[(a,b),(c,d)]" '
         'Note that the quotation marks are necessary and that no white space '
         'is allowed.')
-    parser.add_argument('--eval-options',
-                        nargs='+',
-                        action=DictAction,
-                        help='custom options for evaluation')
-    parser.add_argument('--launcher',
-                        choices=['none', 'pytorch', 'slurm', 'mpi'],
-                        default='none',
-                        help='job launcher')
+    parser.add_argument(
+        '--eval-options',
+        nargs='+',
+        action=DictAction,
+        help='custom options for evaluation')
+    parser.add_argument(
+        '--launcher',
+        choices=['none', 'pytorch', 'slurm', 'mpi'],
+        default='none',
+        help='job launcher')
     parser.add_argument(
         '--opacity',
         type=float,
@@ -244,8 +247,8 @@ def main():
             'the evaluation and format results are CPU memory efficient by '
             'default')
 
-    eval_on_format_results = (args.eval is not None
-                              and 'cityscapes' in args.eval)
+    eval_on_format_results = (
+        args.eval is not None and 'cityscapes' in args.eval)
     if eval_on_format_results:
         assert len(args.eval) == 1, 'eval on format results is not ' \
                                     'applicable for metrics other than ' \
@@ -271,32 +274,31 @@ def main():
                 'Please use MMCV >= 1.4.4 for CPU training!'
         model = revert_sync_batchnorm(model)
         model = build_dp(model, cfg.device, device_ids=cfg.gpu_ids)
-        results = single_gpu_test(model,
-                                  data_loader,
-                                  args.show,
-                                  args.show_dir,
-                                  False,
-                                  args.opacity,
-                                  pre_eval=args.eval is not None
-                                  and not eval_on_format_results,
-                                  format_only=args.format_only
-                                  or eval_on_format_results,
-                                  format_args=eval_kwargs)
+        results = single_gpu_test(
+            model,
+            data_loader,
+            args.show,
+            args.show_dir,
+            False,
+            args.opacity,
+            pre_eval=args.eval is not None and not eval_on_format_results,
+            format_only=args.format_only or eval_on_format_results,
+            format_args=eval_kwargs)
     else:
-        model = build_ddp(model,
-                          cfg.device,
-                          device_ids=[int(os.environ['LOCAL_RANK'])],
-                          broadcast_buffers=False)
-        results = multi_gpu_test(model,
-                                 data_loader,
-                                 args.tmpdir,
-                                 args.gpu_collect,
-                                 False,
-                                 pre_eval=args.eval is not None
-                                 and not eval_on_format_results,
-                                 format_only=args.format_only
-                                 or eval_on_format_results,
-                                 format_args=eval_kwargs)
+        model = build_ddp(
+            model,
+            cfg.device,
+            device_ids=[int(os.environ['LOCAL_RANK'])],
+            broadcast_buffers=False)
+        results = multi_gpu_test(
+            model,
+            data_loader,
+            args.tmpdir,
+            args.gpu_collect,
+            False,
+            pre_eval=args.eval is not None and not eval_on_format_results,
+            format_only=args.format_only or eval_on_format_results,
+            format_args=eval_kwargs)
 
     rank, _ = get_dist_info()
     if rank == 0:

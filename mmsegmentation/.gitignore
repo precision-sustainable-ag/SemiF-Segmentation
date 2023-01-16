@@ -10,6 +10,14 @@ assets
 checkpoints
 output
 
+weedsimg**
+weedsimagerepo**
+weedsimagesrepo**
+developed**
+output**
+pspnet_developed_results**
+both*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

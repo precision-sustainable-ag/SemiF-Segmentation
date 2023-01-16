@@ -34,17 +34,49 @@ class PSAWeedsDataset(CustomDataset):
                    'cultivated radish', 'Cereal rye', 'Triticale',
                    'Winter wheat', 'Oats', 'Barley', 'Black oats')
 
-    CLASSES = ('background', 'Palmer amaranth', 'Common ragweed', 'Sicklepod',
-               'Cocklebur', 'Large crabgrass', 'Goosegrass',
-               'Broadleaf signalgrass', 'Purple nutsedge', 'Waterhemp',
-               'Barnyardgrass', 'Jungle rice', 'Texas millet', 'Kochia',
-               'Common sunflower', 'Ragweed parthenium', 'Johnsongrass',
-               'Soybean', 'Smooth pigweed', 'Common lambsquarters',
-               'Fall panicum', 'Jimson weed', 'Velvetleaf', 'Yellow foxtail',
-               'Giant foxtail', 'Horseweed', 'Maize', 'unknown',
-               'colorchecker', 'Hairy vetch', 'Winter pea', 'Crimson clover',
-               'Red clover', 'Mustards', 'cultivated radish', 'Cereal rye',
-               'Triticale', 'Winter wheat', 'Oats', 'Barley', 'Black oats')
+    CLASSES = (
+        'background',
+        'Palmer amaranth',
+        'Common ragweed',
+        'Sicklepod',
+        'Cocklebur',
+        'Large crabgrass',
+        'Goosegrass',
+        'Broadleaf signalgrass',
+        'Purple nutsedge',
+        'Waterhemp',
+        'Barnyardgrass',
+        'Jungle rice',
+        'Texas millet',
+        'Kochia',
+        'Common sunflower',
+        'Ragweed parthenium',
+        'Johnsongrass',
+        'Soybean',
+        'Smooth pigweed',
+        'Common lambsquarters',
+        'Fall panicum',
+        'Jimson weed',
+        'Velvetleaf',
+        'Yellow foxtail',
+        'Giant foxtail',
+        'Horseweed',
+        'Maize',
+        'unknown',
+        'colorchecker',
+        'Hairy vetch',
+        'Winter pea',
+        'Crimson clover',
+        'Red clover',
+        'Mustards',
+        'cultivated radish',
+        'Cereal rye',
+        'Triticale',
+        'Winter wheat',
+        'Oats',
+        'Barley',
+        'Black oats',
+    )
 
     PALETTE = [[0, 0, 0], [29, 104, 110], [228, 82, 241], [96, 229, 78],
                [144, 59, 226], [158, 227, 63], [93, 76, 231], [219, 233, 60],
@@ -59,10 +91,8 @@ class PSAWeedsDataset(CustomDataset):
                [64, 112, 24]]
 
     def __init__(self, split, **kwargs):
-        super(PSAWeedsDataset, self).__init__(img_suffix='.jpg',
-                                              seg_map_suffix='.png',
-                                              split=split,
-                                              **kwargs)
+        super(PSAWeedsDataset, self).__init__(
+            img_suffix='.jpg', seg_map_suffix='.png', split=split, **kwargs)
 
         # class_indices = [
         #     list(self.ALL_CLASSES).index(x) if x != 'background' else 0
