@@ -1,8 +1,0 @@
-1,Palmer amaranth,29,104,110,
-2,Common ragweed,228,82,241,
-3,Sicklepod,96,229,78,
-4,Cocklebur,144,59,226,
-5,Large crabgrass,158,227,63,
-6,Goosegrass,93,76,231,
-8,Purple nutsedge,189,54,214,
-12,Texas millet,227,66,198,
