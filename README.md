@@ -1,60 +1,26 @@
 # SemiF-Segmentation
 
-SemiF-Segmentation is a repository for training semantic segmentation models using agronomically relevant plant images! This repository is intended for scientific researchers and technical experts who are interested in using machine learning techniques to segment weeds, crops, and cover crops in agricultural images. 
+### **Script Descriptions**
 
-In this repository, you will find a collection of data curation tools and approaches that are specifically designed for preparing and organizing agricultural image data, in particular the PSA SemiField-Image repository. In addition to these tools, we use [MMSegmentation](https://github.com/open-mmlab/mmsegmentation) and their range of model architectures for training. We also provide examples and tutorials on how to use our tools and resources to solve challenging tasks in the field of agriculture, such as multispecies weed segementation.
-
-
-### Table of Contents  
-[Setup](#setup)  
-[Classes](#classes)  
-[Git subtree commands](#git-subtree-commands)  
-
-<br>
-
-
-<div style="width: 100%; height: 100%">
-
-![](figures/goose.png)
-  
-</div>
-
-
-
-## Setup
-
-### 1. Clone and move into this repo
-
-```
-git clone git@github.com:precision-sustainable-ag/SemiF-Segmentation.git
-cd SemiF-Segmentation
-```
-
-### 2. [Install mmsegmentation](https://mmsegmentation.readthedocs.io/en/latest/get_started.html)
-
-
-### 3. Create a `./data` folder in the `SemiF-Segmentation` project root
-
-```
-mkdir data
-```
-
-### 4. Download and place [`species_info.json`](https://github.com/precision-sustainable-ag/SemiF-AnnotationPipeline/blob/306f85ec966146c8adb985d5f82724a99990a3b9/data/semifield-utils/species_information/species_info.json) in `./data`
-
-
-
-<br>
+#### **1. `move_fullsized_data.py`**
+This script manages the movement of full-sized image and mask files from multiple storage locations to a centralized directory. It ensures that both image and mask files are matched correctly, filters out unmatched files (optionally deleting them), and organizes the data into a standardized structure. The script supports copying using multithreading.
 
 ---
-<br> 
 
-## Classes
+#### **2. `grid_crop.py`**
+This script processes a dataset of images and corresponding masks by cropping them into smaller, fixed-size tiles. It ensures that only tiles containing relevant data (non-zero mask values) are retained. This script supports multiprocessing.
 
-class_id 0 is background.
+---
 
-[PSA Classes](mmsegmentation/mmseg/core/evaluation/class_names.py#L129)  
+#### **3. `train_val_test_split.py`**
+This script splits a dataset of images and masks into training, validation, and optional test sets. The split proportions are configurable, and the files are copied into their respective directories for each set. The script ensures that all splits maintain proper image-mask correspondence and supports concurrent file copying.
 
-[PSA Palette](mmsegmentation/mmseg/core/evaluation/class_names.py#L141)
+---
+
+#### **4. `remap_masks.py`**
+This script remaps mask values in image files based on predefined class group mappings. It processes train, validation, and test splits separately, converting mask values into simplified categories for specific tasks. The remapped masks are saved into corresponding output directories. The script can process files sequentially or concurrently.
+
+---
 
 ### Class Format Example (Palmer amaranth)
 ```json
@@ -85,39 +51,4 @@ class_id 0 is background.
                 110
             ]   ...
 }
-```
-
-
-<br>
-
-
-## [Git subtree commands](https://www.atlassian.com/git/tutorials/git-subtree)
-
-
-### 1. Add subtree
-```
-git subtree add --prefix mmsegmentation git@github.com:open-mmlab/mmsegmentation.git master --squash
-```
-
-### 2. Add remote
-```
-git remote add -f mmsegmentation git@github.com:open-mmlab/mmsegmentation.git
-```
-
-### 3. Update subtree
-```
-git subtree pull --prefix mmsegmentation git@github.com:open-mmlab/mmsegmentation.git master --squash
-```
-
-### 4. Contributing back upstream 
-We can freely commit our fixes to the sub-project in our local working directory now. When it’s time to contribute back to the upstream project, we need to fork the project and add it as another remote:
-
-```
-git remote add mmsegmentation ssh://git@bitbucket.org/durdn/vim-surround.git
-```
-
-#### Not sure what these do, not working for me. 
-```
-git fetch mmsegmentation master
-git subtree pull --prefix mmsegmentation master --squash
 ```

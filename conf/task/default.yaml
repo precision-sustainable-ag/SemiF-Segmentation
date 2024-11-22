@@ -1,0 +1,22 @@
+move_data:
+  query_result: /home/mkutuga/SemiF-ImageCuration/balanced_dataset.json
+  remove_unmatched: True # remove images that do not have masks and vice-versa
+
+grid_crop:
+  crop_height: 2048
+  crop_width: 2048
+
+train_val_test_split:
+  train_size:  # not used, train_size is calculated from val_size and test_size
+  val_size: 0.075
+  test_size: 0.05
+  seed: 42
+  use_concurrency: True
+
+remap_masks:
+  group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
+  process_concurrently: True
+
+update_groupings:
+  colorchecker_to_background: True # True maps the colorchecker to the background class
+  create_custom_grouping: True # True creates a custom grouping based on the species_info file
