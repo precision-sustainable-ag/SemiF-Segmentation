@@ -1,0 +1,21 @@
+defaults:
+  - paths: default           # Default paths config
+  - task: default          # Default training config
+  - _self_                   # Ensures overriding behavior
+
+project_name: "balanced"
+
+hydra:
+  run:
+    dir: ${hydra:runtime.cwd}/outputs/${project_name}/${job_now_date}/${job_now_time}
+  # output_subdir: outputs/${project_name}/${job_now_date}/${job_now_time}
+
+
+job_now_date: &nowdir ${now:%Y-%m-%d}
+job_now_time: &nowtime ${now:%H-%M-%S}
+
+tasks: 
+  - move_fullsized_data
+  - grid_crop
+  - train_val_test_split
+  - remap_masks
