@@ -35,3 +35,7 @@ split_data:
   test_image_dir: ${paths.split_data.split_dir}/test/images
   test_mask_dir: ${paths.split_data.split_dir}/test/masks
   test_remapped_mask_dir: ${paths.split_data.split_dir}/test/remapped_masks
+
+# species info for update_groupings
+species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/species_information/species_info.json
+python_grouping_file: ${hydra:runtime.cwd}/src/utils/class_groupings.py

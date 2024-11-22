@@ -14,7 +14,9 @@ train_val_test_split:
   use_concurrency: True
 
 remap_masks:
-  group_name: "monocot_dicot" # must be in src/utils/class_groupings
+  group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
   process_concurrently: True
 
-
+update_groupings:
+  colorchecker_to_background: True # True maps the colorchecker to the background class
+  create_custom_grouping: True # True creates a custom grouping based on the species_info file
