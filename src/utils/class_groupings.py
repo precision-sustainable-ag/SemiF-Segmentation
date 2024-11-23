@@ -673,6 +673,7 @@ CLASSGROUPS = {
                 23,
                 24,
                 26,
+                27,
                 35,
                 36,
                 37,
@@ -683,12 +684,6 @@ CLASSGROUPS = {
                 47
             ],
             "values": 1
-        },
-        "unknown": {
-            "class_ids": [
-                27
-            ],
-            "values": 3
         }
     },
     "vegetation": {
