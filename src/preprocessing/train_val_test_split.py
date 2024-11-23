@@ -6,6 +6,7 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import hydra
 from omegaconf import DictConfig
+from typing import Dict
 import logging
 
 log = logging.getLogger(__name__)
@@ -59,11 +60,18 @@ class DataSet:
         self.random_state = random_state
         self.use_concurrency = use_concurrency
 
-    def gather_files(self, image_dir: Path, mask_dir: Path):
+    def gather_files(self, image_dir: Path, mask_dir: Path, model_testing: Dict):
         """Gather image and mask files from the given directories."""
         log.info("Gathering images and masks.")
+
         self.image_list = sorted(image_dir.glob("*.jpg"))
         self.mask_list = sorted(mask_dir.glob("*.png"))
+        if model_testing.status:
+            log.info("Using a subset of the data for quick and dirty model testing.")
+            num_images = int(len(self.image_list) * model_testing.factor)
+            self.image_list = self.image_list[:num_images]
+            self.mask_list = self.mask_list[:num_images]
+
         assert self.image_list, "No images found in the images directory."
         assert self.mask_list, "No masks found in the masks directory."
 
@@ -147,12 +155,21 @@ def main(cfg: DictConfig):
         random_state=cfg.task.train_val_test_split.seed,
         use_concurrency=cfg.task.train_val_test_split.use_concurrency,
     )
+    
     log.info("Gathering files.")
-    dataset.gather_files(Path(cfg.paths.cropped_image_dir), Path(cfg.paths.cropped_mask_dir))
+    
+    image_dir = Path(cfg.paths.cropped_image_dir)
+    mask_dir = Path(cfg.paths.cropped_mask_dir)
+    model_testing = cfg.task.train_val_test_split.model_testing
+    
+    dataset.gather_files(image_dir, mask_dir, model_testing)
+    
     log.info("Splitting data.")
     dataset.split_data()
+    
     log.info("Preparing destination directories.")
     dataset.move_files()
+    
     log.info("Dataset split complete.")
 
 
