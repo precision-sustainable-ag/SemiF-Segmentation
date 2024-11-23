@@ -1,6 +1,10 @@
 # Local directories and files
 data
+models
+
+# Logs
 outputs
+lightning_logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
