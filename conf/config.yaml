@@ -1,6 +1,8 @@
 defaults:
   - paths: default           # Default paths config
   - task: default          # Default training config
+  - train: default         # Train config
+  - model: model_a         # Model config
   - _self_                   # Ensures overriding behavior
 
 project_name: "balanced"
@@ -19,3 +21,6 @@ tasks:
   - grid_crop
   - train_val_test_split
   - remap_masks
+  - data_stats
+  - train
+  - viz_results

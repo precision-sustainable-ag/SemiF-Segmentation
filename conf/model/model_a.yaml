@@ -1,0 +1,3 @@
+arch: FPN
+encoder: resnext50_32x4d
+in_channels: 3

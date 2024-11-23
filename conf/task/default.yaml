@@ -8,10 +8,14 @@ grid_crop:
 
 train_val_test_split:
   train_size:  # not used, train_size is calculated from val_size and test_size
-  val_size: 0.075
-  test_size: 0.05
+  val_size: 0.1
+  test_size: 0.1
   seed: 42
   use_concurrency: True
+  
+  model_testing: # quick and dirty way to generate a small dataset, not recommended for final results
+    status: True
+    factor: 0.01
 
 remap_masks:
   group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
@@ -20,3 +24,9 @@ remap_masks:
 update_groupings:
   colorchecker_to_background: True # True maps the colorchecker to the background class
   create_custom_grouping: True # True creates a custom grouping based on the species_info file
+
+data_stats:
+  ignore_background: True # True ignores the background class for plotting
+
+viz_results:
+  model_dir_n: 0

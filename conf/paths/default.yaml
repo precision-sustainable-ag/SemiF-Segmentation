@@ -3,7 +3,7 @@
 root_dir: ${hydra:runtime.cwd}
 
 # path to data directory
-data_dir: ${paths.root_dir}/data/
+data_dir: ${paths.root_dir}/data
 
 tables_dir: ${paths.root_dir}/tables/${job_now_date}
 
@@ -17,12 +17,12 @@ mask_dir: ${paths.data_dir}/${project_name}/masks
 
 # path to cropped data
 crop_suffix: ${task.grid_crop.crop_height}x${task.grid_crop.crop_width}
-cropped_image_dir: ${paths.data_dir}/${project_name}/cropped_images_${crop_suffix}
-cropped_mask_dir: ${paths.data_dir}/${project_name}/cropped_masks_${crop_suffix}
+cropped_image_dir: ${paths.data_dir}/${project_name}/cropped_images_${paths.crop_suffix}
+cropped_mask_dir: ${paths.data_dir}/${project_name}/cropped_masks_${paths.crop_suffix}
 
 # path to split data
 split_data:
-  split_dir: ${paths.data_dir}/${project_name}/train_val_test_${crop_suffix}
+  split_dir: ${paths.data_dir}/${project_name}/train_val_test_${paths.crop_suffix}
   
   train_image_dir: ${paths.split_data.split_dir}/train/images
   train_mask_dir: ${paths.split_data.split_dir}/train/masks
@@ -39,3 +39,6 @@ split_data:
 # species info for update_groupings
 species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/species_information/species_info.json
 python_grouping_file: ${hydra:runtime.cwd}/src/utils/class_groupings.py
+
+# model output directory
+model_dir: ${paths.root_dir}/models/${project_name}_${paths.crop_suffix}/${model.arch}_${model.encoder}

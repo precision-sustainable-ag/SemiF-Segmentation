@@ -1,0 +1,18 @@
+train_imgs: ${paths.split_data.train_image_dir}
+train_masks: ${paths.split_data.train_remapped_mask_dir}
+val_imgs: ${paths.split_data.val_image_dir}
+val_masks: ${paths.split_data.val_remapped_mask_dir}
+test_imgs: ${paths.split_data.test_image_dir}
+test_masks: ${paths.split_data.test_remapped_mask_dir}
+
+classes:
+  # - background
+  - monocot
+  - dicot
+
+
+batch_size: 4
+shuffle: True
+epochs: 5
+num_workers: 16
+lr: 2e-4
