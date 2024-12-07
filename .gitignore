@@ -1,6 +1,8 @@
 # Local directories and files
 data
 models
+results
+notebooks
 
 # Logs
 outputs
