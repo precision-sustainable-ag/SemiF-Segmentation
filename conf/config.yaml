@@ -1,26 +1,39 @@
 defaults:
   - paths: default           # Default paths config
-  - task: default          # Default training config
+  - preprocess: default          # Default training config
+
+  # Training configs
+  - dataset: combined_veg       # Default dataset config
+  - augment: basic  # Default augmentations config
   - train: default         # Train config
-  - model: model_a         # Model config
+  - model: deeplabv3plus         # Model config
+  - inference: default      # Inference config
   - _self_                   # Ensures overriding behavior
 
-project_name: "balanced"
+project:
+  name: "COMBINED"
+  subname: ${dataset.data_name}
+  output_dir: ${hydra:runtime.cwd}/lightning_logs/${project.name}
 
-hydra:
-  run:
-    dir: ${hydra:runtime.cwd}/outputs/${project_name}/${job_now_date}/${job_now_time}
-  # output_subdir: outputs/${project_name}/${job_now_date}/${job_now_time}
-
-
-job_now_date: &nowdir ${now:%Y-%m-%d}
-job_now_time: &nowtime ${now:%H-%M-%S}
+logger:
+  save_dir: ${project.output_dir}
+  name: ${project.subname}
 
 tasks:
-  - move_fullsized_data
+  # - move_fullsized_data
   - grid_crop
   - train_val_test_split
   - remap_masks
   - data_stats
-  - train
-  - viz_results
+  # - smptrain
+  # - inference
+
+job_now_date: &nowdir ${now:%Y-%m-%d}
+job_now_time: &nowtime ${now:%H:%M:%S}
+
+mode: ??? # required argument for command line. Either train or inference
+
+hydra:
+  run:
+    dir: ${project.output_dir}/${project.subname}/${mode}/hyrda/${job_now_date}_${job_now_time}  # Dynamically set the directory based on task
+  # output_subdir: "default"

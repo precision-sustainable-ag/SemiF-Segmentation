@@ -1,0 +1,7 @@
+arch_name: UnetPlusPlus
+encoder_name: resnet152
+encoder_weights: imagenet
+in_channels: 3
+out_classes: 1
+mode: binary
+ignore_index: null  # Set to null if no ignored pixels

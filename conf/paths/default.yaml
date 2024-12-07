@@ -12,17 +12,17 @@ primary_storage: /mnt/research-projects/s/screberg/longterm_images
 secondary_storage: /mnt/research-projects/s/screberg/GROW_DATA
 
 # path to original data
-image_dir: ${paths.data_dir}/${project_name}/images
-mask_dir: ${paths.data_dir}/${project_name}/masks
+image_dir: ${paths.data_dir}/${project.name}/images
+mask_dir: ${paths.data_dir}/${project.name}/masks
 
 # path to cropped data
 crop_suffix: ${task.grid_crop.crop_height}x${task.grid_crop.crop_width}
-cropped_image_dir: ${paths.data_dir}/${project_name}/cropped_images_${paths.crop_suffix}
-cropped_mask_dir: ${paths.data_dir}/${project_name}/cropped_masks_${paths.crop_suffix}
+cropped_image_dir: ${paths.data_dir}/${project.name}/cropped_images_${paths.crop_suffix}
+cropped_mask_dir: ${paths.data_dir}/${project.name}/cropped_masks_${paths.crop_suffix}
 
 # path to split data
 split_data:
-  split_dir: ${paths.data_dir}/${project_name}/train_val_test_${paths.crop_suffix}
+  split_dir: ${paths.data_dir}/${project.name}/train_val_test_${paths.crop_suffix}
   
   train_image_dir: ${paths.split_data.split_dir}/train/images
   train_mask_dir: ${paths.split_data.split_dir}/train/masks
@@ -41,4 +41,4 @@ species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/spe
 python_grouping_file: ${hydra:runtime.cwd}/src/utils/class_groupings.py
 
 # model output directory
-model_dir: ${paths.root_dir}/models/${project_name}_${paths.crop_suffix}/${model.arch}_${model.encoder}
+model_dir: ${paths.root_dir}/models/${project.name}_${paths.crop_suffix}/${model.arch}_${model.encoder}
