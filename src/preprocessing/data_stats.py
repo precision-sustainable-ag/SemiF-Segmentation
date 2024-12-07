@@ -163,12 +163,12 @@ def plot_class_distributions(class_frequencies, title, group_name, output_dir=No
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     log.info("Starting data statistics calculation...")
-    split_dir = Path(cfg.paths.split_data.split_dir)
-    train_image_dir = Path(cfg.paths.split_data.train_image_dir)
-    train_remapped_mask_dir = Path(cfg.paths.split_data.train_remapped_mask_dir)
-    val_remapped_mask_dir = Path(cfg.paths.split_data.val_remapped_mask_dir)
-    test_remapped_mask_dir = Path(cfg.paths.split_data.test_remapped_mask_dir)
-    output_dir = Path(cfg.paths.model_dir).parent / "data_plots"
+    split_dir = Path(cfg.paths.preprocess.split_data.split_dir)
+    train_image_dir = split_dir / "train" / "images"
+    train_remapped_mask_dir = split_dir / "train" / "remapped_masks"
+    val_remapped_mask_dir = split_dir / "val" / "remapped_masks"
+    test_remapped_mask_dir = split_dir / "test" / "remapped_masks"
+    output_dir = Path(cfg.project.output_dir) / "data" / "data_stats"
     output_dir.mkdir(parents=True, exist_ok=True)
     group_name = cfg.preprocess.remap_masks.group_name
 

@@ -1,21 +1,22 @@
 mode: preprocess
 
 tasks:
-  # - move_data
-  - grid_crop
-  - train_val_test_split
-  - remap_masks
-  - update_groupings
-  - data_stats
-  # - viz_results
+  move_data: false
+  grid_crop: true # successfully tested
+  train_val_test_split: true # successfully tested
+  remap_masks: true # successfully tested
+  data_stats: true # successfully tested
+  viz_results: false
+
+data_dir: ${paths.root_dir}/data/SEMIF
 
 move_data:
   query_result: /home/mkutuga/SemiF-ImageCuration/balanced_dataset.json
   remove_unmatched: True # remove images that do not have masks and vice-versa
 
 grid_crop:
-  crop_height: 256
-  crop_width: 256
+  crop_height: 1024
+  crop_width: 1024
 
 train_val_test_split:
   train_size:  # not used, train_size is calculated from val_size and test_size
@@ -23,18 +24,15 @@ train_val_test_split:
   test_size: 0.1
   seed: 42
   use_concurrency: True
+  remove_cropped_data: True
   
   model_testing: # quick and dirty way to generate a small dataset, not recommended for final results
-    status: True
+    status: true
     factor: 0.01
 
 remap_masks:
   group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
   process_concurrently: True
-
-update_groupings:
-  colorchecker_to_background: True # True maps the colorchecker to the background class
-  create_custom_grouping: True # True creates a custom grouping based on the species_info file
 
 data_stats:
   ignore_background: False # True ignores the background class for plotting

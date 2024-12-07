@@ -5,40 +5,34 @@ root_dir: ${hydra:runtime.cwd}
 # path to data directory
 data_dir: ${paths.root_dir}/data
 
-tables_dir: ${paths.root_dir}/tables/${job_now_date}
 
 # NCSU Storage lockers
 primary_storage: /mnt/research-projects/s/screberg/longterm_images
 secondary_storage: /mnt/research-projects/s/screberg/GROW_DATA
 
-# path to original data
-image_dir: ${paths.data_dir}/${project.name}/images
-mask_dir: ${paths.data_dir}/${project.name}/masks
+preprocess:
+  # path to original data
+  image_dir: ${preprocess.data_dir}/images
+  mask_dir: ${preprocess.data_dir}/masks
 
-# path to cropped data
-crop_suffix: ${task.grid_crop.crop_height}x${task.grid_crop.crop_width}
-cropped_image_dir: ${paths.data_dir}/${project.name}/cropped_images_${paths.crop_suffix}
-cropped_mask_dir: ${paths.data_dir}/${project.name}/cropped_masks_${paths.crop_suffix}
+  # path to cropped data
+  crop_suffix: ${preprocess.grid_crop.crop_height}x${preprocess.grid_crop.crop_width}
+  cropped_image_dir: ${project.output_dir}/data/cropped_images_${paths.preprocess.crop_suffix}
+  cropped_mask_dir: ${project.output_dir}/data/cropped_masks_${paths.preprocess.crop_suffix}
 
-# path to split data
-split_data:
-  split_dir: ${paths.data_dir}/${project.name}/train_val_test_${paths.crop_suffix}
-  
-  train_image_dir: ${paths.split_data.split_dir}/train/images
-  train_mask_dir: ${paths.split_data.split_dir}/train/masks
-  train_remapped_mask_dir: ${paths.split_data.split_dir}/train/remapped_masks
+  # path to split data
+  split_data:
+    split_dir: ${project.output_dir}/data/train_val_test_${paths.preprocess.crop_suffix}
+    
+    datasets:
+      - train
+      - val
+      - test
 
-  val_image_dir: ${paths.split_data.split_dir}/val/images
-  val_mask_dir: ${paths.split_data.split_dir}/val/masks
-  val_remapped_mask_dir: ${paths.split_data.split_dir}/val/remapped_masks
-
-  test_image_dir: ${paths.split_data.split_dir}/test/images
-  test_mask_dir: ${paths.split_data.split_dir}/test/masks
-  test_remapped_mask_dir: ${paths.split_data.split_dir}/test/remapped_masks
-
-# species info for update_groupings
-species_info: /home/psa_images/SemiF-AnnotationPipeline/data/semifield-utils/species_information/species_info.json
-python_grouping_file: ${hydra:runtime.cwd}/src/utils/class_groupings.py
-
+    dataset_subdirs:
+      - images
+      - masks
+      - remapped_masks
+    
 # model output directory
-model_dir: ${paths.root_dir}/models/${project.name}_${paths.crop_suffix}/${model.arch}_${model.encoder}
+model_dir: ${paths.root_dir}/models/${project.name}_${paths.preprocess.crop_suffix}/${model.arch}_${model.encoder}

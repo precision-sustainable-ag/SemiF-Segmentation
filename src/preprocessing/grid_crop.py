@@ -100,10 +100,10 @@ class CropProcessor:
 def main(cfg: DictConfig):
     log.info("Cropping images and masks")
     processor = CropProcessor(
-        image_folder=cfg.paths.image_dir,
-        mask_folder=cfg.paths.mask_dir,
-        output_cropped_image_folder=cfg.paths.cropped_image_dir,
-        output_cropped_mask_folder=cfg.paths.cropped_mask_dir,
+        image_folder=cfg.paths.preprocess.image_dir,
+        mask_folder=cfg.paths.preprocess.mask_dir,
+        output_cropped_image_folder=cfg.paths.preprocess.cropped_image_dir,
+        output_cropped_mask_folder=cfg.paths.preprocess.cropped_mask_dir,
         crop_height=cfg.preprocess.grid_crop.crop_height,
         crop_width=cfg.preprocess.grid_crop.crop_width,
     )

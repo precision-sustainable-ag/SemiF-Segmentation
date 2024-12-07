@@ -131,18 +131,20 @@ class SplitDirectoryProcessor:
 @hydra.main(version_base="1.3", config_path="configs", config_name="split_mask_processing_config")
 def main(cfg: DictConfig):
     log.info("Starting mask processing for train, val, and test splits.")
+    split_dir = Path(cfg.paths.preprocess.split_data.split_dir)
     split_dirs = {
         "train": {
-            "mask_dir": cfg.paths.split_data.train_mask_dir,
-            "remapped_mask_dir": cfg.paths.split_data.train_remapped_mask_dir,
+            "mask_dir": split_dir / "train" / "masks",
+
+            "remapped_mask_dir": split_dir / "train" / "remapped_masks",
         },
         "val": {
-            "mask_dir": cfg.paths.split_data.val_mask_dir,
-            "remapped_mask_dir": cfg.paths.split_data.val_remapped_mask_dir,
+            "mask_dir": split_dir / "val" / "masks",
+            "remapped_mask_dir": split_dir / "val" / "remapped_masks",
         },
         "test": {
-            "mask_dir": cfg.paths.split_data.test_mask_dir,
-            "remapped_mask_dir": cfg.paths.split_data.test_remapped_mask_dir,
+            "mask_dir": split_dir / "test" / "masks",
+            "remapped_mask_dir": split_dir / "test" / "remapped_masks",
         },
     }
 
