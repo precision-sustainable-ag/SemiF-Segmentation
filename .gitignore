@@ -1,12 +1,17 @@
-# MMSegmentation
-# mmsegmentation
-all_*
-assets
-checkpoints
-output
+# Local directories and files
+data
+models
+results
+notebooks
+
+# Logs
+outputs
+lightning_logs
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
-
+.vscode/
+.DS_Store
 # Jupyter Notebook
 .ipynb_checkpoints
 

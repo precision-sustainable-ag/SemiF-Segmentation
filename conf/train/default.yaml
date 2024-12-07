@@ -1,0 +1,22 @@
+mode: train
+epochs: 50
+batch_size: 16
+dist_train: false
+augments: default
+cuda_visible_devices:
+  enable: true
+  devices: 1,2
+train_strategy: auto
+trainer:
+  max_epochs: ${train.epochs}
+  enable_progress_bar: true
+  log_every_n_steps: 1
+  enable_model_summary: true
+  num_sanity_val_steps: 0
+  deterministic: true
+  
+callbacks:
+  monitor: valid_dataset_iou
+  mode: max
+  save_top_k: 1
+  save_last: true

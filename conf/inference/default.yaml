@@ -1,0 +1,37 @@
+mode: inference
+
+subname: CCCamImages
+input_dir: "data/CCCamImages/images"
+# input_dir: "data/COMBINED_VEG_TEST/train_val_test_256x256/test/images"
+
+version: 0
+
+rescale_factor: .75
+threshold: 0.75
+use_normalization: true
+
+cuda_visible_devices:
+  enable: true
+  devices: 5
+
+samplek: 20
+
+seed: 42
+
+mean:
+  - 0.39847057407541153
+  - 0.3801075789029128
+  - 0.293452011562886
+std:
+  - 0.1861412859826447
+  - 0.1825776729079864
+  - 0.1531887242997391
+
+inference_root: ${project.output_dir}/${project.subname}/${inference.mode}/${inference.subname}
+inf_scaled_thresh: scaled_${inference.rescale_factor}_thresh_${inference.threshold}_norm_${inference.use_normalization}
+
+inf_output_dir: ${inference.inference_root}/${inference.inf_scaled_thresh}
+
+plot:
+  dpi: 300
+  transparent: true
