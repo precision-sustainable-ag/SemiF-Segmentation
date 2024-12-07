@@ -103,12 +103,12 @@ def main(cfg: DictConfig):
 
     log.info("Moving full-sized images and masks")
     manager = DatasetManager(
-        project_name=cfg.project_name,
-        query_result=cfg.task.move_data.query_result,
+        project_name=cfg.project.name,
+        query_result=cfg.preprocess.move_data.query_result,
         primary_storage=cfg.paths.primary_storage,
         secondary_storage=cfg.paths.secondary_storage,
         destination_dir=cfg.paths.data_dir,
-        remove_unmatched=cfg.task.move_data.remove_unmatched
+        remove_unmatched=cfg.preprocess.move_data.remove_unmatched
     )
 
     manager.load_images_and_masks()

@@ -148,8 +148,8 @@ def main(cfg: DictConfig):
 
     processor = SplitDirectoryProcessor(
         split_dirs=split_dirs,
-        group_name=cfg.task.remap_masks.group_name,
-        process_concurrently=cfg.task.remap_masks.process_concurrently,
+        group_name=cfg.preprocess.remap_masks.group_name,
+        process_concurrently=cfg.preprocess.remap_masks.process_concurrently,
     )
     processor.process_splits()
     log.info("Mask processing complete for all splits.")

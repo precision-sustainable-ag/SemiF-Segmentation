@@ -8,7 +8,7 @@ import hydra
 from omegaconf import DictConfig
 from typing import Dict
 import logging
-
+import random
 log = logging.getLogger(__name__)
 
 
@@ -69,9 +69,12 @@ class DataSet:
         if model_testing.status:
             log.info("Using a subset of the data for quick and dirty model testing.")
             num_images = int(len(self.image_list) * model_testing.factor)
-            self.image_list = self.image_list[:num_images]
-            self.mask_list = self.mask_list[:num_images]
-
+            
+            self.image_list = random.sample(self.image_list, num_images)
+            image_stems = [img.stem for img in self.image_list]
+            
+            self.mask_list = [mask_dir / f"{stem}.png" for stem in image_stems]
+            
         assert self.image_list, "No images found in the images directory."
         assert self.mask_list, "No masks found in the masks directory."
 
@@ -150,17 +153,17 @@ def main(cfg: DictConfig):
     log.info("Starting dataset split.")
     dataset = DataSet(
         dirs=cfg.paths.split_data,
-        val_size=cfg.task.train_val_test_split.val_size,
-        test_size=cfg.task.train_val_test_split.test_size,
-        random_state=cfg.task.train_val_test_split.seed,
-        use_concurrency=cfg.task.train_val_test_split.use_concurrency,
+        val_size=cfg.preprocess.train_val_test_split.val_size,
+        test_size=cfg.preprocess.train_val_test_split.test_size,
+        random_state=cfg.preprocess.train_val_test_split.seed,
+        use_concurrency=cfg.preprocess.train_val_test_split.use_concurrency,
     )
     
     log.info("Gathering files.")
     
     image_dir = Path(cfg.paths.cropped_image_dir)
     mask_dir = Path(cfg.paths.cropped_mask_dir)
-    model_testing = cfg.task.train_val_test_split.model_testing
+    model_testing = cfg.preprocess.train_val_test_split.model_testing
     
     dataset.gather_files(image_dir, mask_dir, model_testing)
     

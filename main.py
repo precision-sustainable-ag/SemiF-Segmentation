@@ -8,11 +8,11 @@ from src.preprocessing.move_fullsized_data import main as move_fullsized_data
 from src.preprocessing.grid_crop import main as grid_crop
 from src.preprocessing.train_val_test_split import main as train_val_test_split
 from src.preprocessing.remap_masks import main as remap_masks
+from src.preprocessing.data_stats import main as data_stats
 
+from src.inference import main as inference
+from src.smptrain import main as smptrain
 
-from src.train import main as train
-from src.viz_results import main as viz_results
-from src.data_stats import main as data_stats
 
 log = logging.getLogger(__name__)
 
@@ -22,9 +22,13 @@ TASK_REGISTRY = {
     "grid_crop": grid_crop,
     "train_val_test_split": train_val_test_split,
     "remap_masks": remap_masks,
-    "train": train,
-    "viz_results": viz_results,
+    # "train": train,
+    # "viz_results": viz_results,
     "data_stats": data_stats,
+    "smptrain": smptrain,
+    # "binary_unet_plus": binary_unet_plus,
+    # "multiclass_unet_plus": multiclass_unet_plus,
+    "inference": inference
     # Add more tasks here as needed
 }
 

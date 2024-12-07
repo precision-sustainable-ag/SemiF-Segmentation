@@ -104,8 +104,8 @@ def main(cfg: DictConfig):
         mask_folder=cfg.paths.mask_dir,
         output_cropped_image_folder=cfg.paths.cropped_image_dir,
         output_cropped_mask_folder=cfg.paths.cropped_mask_dir,
-        crop_height=cfg.task.grid_crop.crop_height,
-        crop_width=cfg.task.grid_crop.crop_width,
+        crop_height=cfg.preprocess.grid_crop.crop_height,
+        crop_width=cfg.preprocess.grid_crop.crop_width,
     )
     processor.process_all()
     log.info("Cropping complete")
