@@ -38,12 +38,13 @@ class FileHelper:
         """Ensure directories exist, creating them if necessary."""
         for dir_path in dirs:
             dir_path.mkdir(exist_ok=True, parents=True)
+            log.info(f"Created directory: {dir_path}")
 
 
 class DataSet:
     """Class to manage and process a dataset of images and masks."""
 
-    def __init__(self, dirs, val_size=0.1, test_size=0.1, random_state=42, use_concurrency=True):
+    def __init__(self, split_dir_cfg, val_size=0.1, test_size=0.1, random_state=42, use_concurrency=True):
         """
         Initialize the dataset handler.
         Args:
@@ -53,8 +54,7 @@ class DataSet:
             random_state (int): Random seed for splitting data.
             use_concurrency (bool): Whether to use concurrent file operations.
         """
-        self.dirs = {k: Path(v) for k, v in dirs.items()}
-        
+        self.split_dir_cfg = split_dir_cfg
         self.test_size = test_size
         self.val_size = val_size
         self.random_state = random_state
@@ -115,29 +115,33 @@ class DataSet:
         log.info(f"Validation images: \t{len(self.val_img_paths)}")
         log.info(f"Test images: \t{len(self.test_img_paths)}")
 
-    def prepare_destination(self):
-        """Prepare destination directories."""
-        FileHelper.ensure_directories_exist(*self.dirs.values())
-
     def move_files(self):
         """Copying files from source to destination."""
         log.info("Copying files.")
-        self.prepare_destination()
+        split_dir = Path(self.split_dir_cfg.split_dir)
+        datasets = self.split_dir_cfg.datasets
+        dataset_subdirs = self.split_dir_cfg.dataset_subdirs
+
+        for dataset in datasets:
+            for subdir in dataset_subdirs:
+                dir_path = Path(split_dir / dataset / subdir)
+                dir_path.mkdir(exist_ok=True, parents=True)
+                log.info(f"Created directory: {dir_path}")
 
         def create_source_dest_pairs(src_paths, dest_dir):
             return [(src, dest_dir / src.name) for src in src_paths]
 
         pairs = {
-            "train_img": create_source_dest_pairs(self.train_img_paths, self.dirs["train_image_dir"]),
-            "train_mask": create_source_dest_pairs(self.train_labels_paths, self.dirs["train_mask_dir"]),
-            "val_img": create_source_dest_pairs(self.val_img_paths, self.dirs["val_image_dir"]),
-            "val_mask": create_source_dest_pairs(self.val_labels_paths, self.dirs["val_mask_dir"]),
-            "test_img": create_source_dest_pairs(self.test_img_paths, self.dirs["test_image_dir"]),
-            "test_mask": create_source_dest_pairs(self.test_mask_paths, self.dirs["test_mask_dir"]),
+            "train_img": create_source_dest_pairs(self.train_img_paths, split_dir / 'train' / 'images'),
+            "train_mask": create_source_dest_pairs(self.train_labels_paths, split_dir / 'train' / 'masks'),
+            "val_img": create_source_dest_pairs(self.val_img_paths, split_dir / 'val' / 'images'),
+            "val_mask": create_source_dest_pairs(self.val_labels_paths, split_dir / 'val' / 'masks'),
+            "test_img": create_source_dest_pairs(self.test_img_paths, split_dir / 'test' / 'images'),
+            "test_mask": create_source_dest_pairs(self.test_mask_paths, split_dir / 'test' / 'masks'),
         }
 
         for key, pair_list in pairs.items():
-            if not pair_list:  # Skip empty pairs (e.g., test set if unused)
+            if not pair_list:  
                 continue
 
             if self.use_concurrency:
@@ -147,12 +151,19 @@ class DataSet:
                 log.info(f"Copying {key} files sequentially.")
                 FileHelper.move_sequentially(pair_list, f"Copying {key} files")
 
+        log.info("Removing cropped image and mask directories.")
+        
+    def remove_cropped_dirs(self, image_dir, mask_dir):
+        shutil.rmtree(image_dir)
+        shutil.rmtree(mask_dir)
+        log.info("Removed cropped image and mask directories.")
 
 @hydra.main(version_base="1.3", config_path="configs", config_name="dataset_config")
 def main(cfg: DictConfig):
     log.info("Starting dataset split.")
+    
     dataset = DataSet(
-        dirs=cfg.paths.split_data,
+        split_dir_cfg=cfg.paths.preprocess.split_data,
         val_size=cfg.preprocess.train_val_test_split.val_size,
         test_size=cfg.preprocess.train_val_test_split.test_size,
         random_state=cfg.preprocess.train_val_test_split.seed,
@@ -161,8 +172,8 @@ def main(cfg: DictConfig):
     
     log.info("Gathering files.")
     
-    image_dir = Path(cfg.paths.cropped_image_dir)
-    mask_dir = Path(cfg.paths.cropped_mask_dir)
+    image_dir = Path(cfg.paths.preprocess.cropped_image_dir)
+    mask_dir = Path(cfg.paths.preprocess.cropped_mask_dir)
     model_testing = cfg.preprocess.train_val_test_split.model_testing
     
     dataset.gather_files(image_dir, mask_dir, model_testing)
@@ -172,9 +183,12 @@ def main(cfg: DictConfig):
     
     log.info("Preparing destination directories.")
     dataset.move_files()
+
+    if cfg.preprocess.train_val_test_split.remove_cropped_data:
+        log.info("Removing cropped image and mask directories.")
+        dataset.remove_cropped_dirs(image_dir, mask_dir)
     
     log.info("Dataset split complete.")
-
 
 if __name__ == "__main__":
     main()
