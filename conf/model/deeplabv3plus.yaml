@@ -2,6 +2,6 @@ arch_name: DeepLabV3Plus
 encoder_name: resnet152
 encoder_weights: imagenet
 in_channels: 3
-out_classes: 1
-mode: binary
+out_classes: 3
+mode: multiclass # binary or multiclass
 ignore_index: null  # Set to null if no ignored pixels

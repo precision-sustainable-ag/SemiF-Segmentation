@@ -24,19 +24,22 @@ def set_seed(seed=2**3):
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))  # Print full config for debugging
     
-    if cfg.train.cuda_visible_devices.enable:
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.train.cuda_visible_devices.devices)
+    nodes = cfg.train.cuda_visible_devices 
+    devices_str = ",".join(map(str, nodes))    
+    os.environ['CUDA_VISIBLE_DEVICES'] = devices_str
     
     set_seed(cfg.dataset.data_seed)
     
     # Logger
-    logger = CSVLogger(save_dir=cfg.logger.save_dir, name=cfg.logger.name)
+    logger = CSVLogger(save_dir=cfg.logger.save_dir, name=None)
 
     # Directories
-    train_image_dir = Path(cfg.dataset.train.images)
-    train_mask_dir = Path(cfg.dataset.train.masks)
-    val_image_dir = Path(cfg.dataset.val.images)
-    val_mask_dir = Path(cfg.dataset.val.masks)
+    split_data_dir = Path(cfg.paths.train.split_data.split_dir)
+    train_image_dir = split_data_dir / "train" / "images"
+    train_mask_dir = split_data_dir / "train" / "remapped_masks"
+    val_image_dir = split_data_dir / "val" / "images"
+    val_mask_dir = split_data_dir / "val" / "remapped_masks"
+
     checkpoint_dir = Path(logger.log_dir, "checkpoints")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
@@ -102,6 +105,7 @@ def main(cfg: DictConfig):
         strategy=train_strategy,
         callbacks=[best_checkpoint, last_checkpoint],
         logger=logger,
+        num_nodes=len(nodes)
     )
     trainer.fit(model, train_loader, val_loader)
     
