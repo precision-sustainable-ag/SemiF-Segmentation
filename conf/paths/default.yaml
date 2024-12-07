@@ -37,6 +37,9 @@ preprocess:
 train:
   split_data:
     split_dir: ${hydra:runtime.cwd}/projects/${project.name}/preprocess/data/train_val_test_${paths.preprocess.crop_suffix}
-    
+
+inference:
+  train_dir: ${hydra:runtime.cwd}/projects/${project.name}/train/version_${inference.version}
+  checkpoints: ${paths.inference.train_dir}/checkpoints
 # model output directory
 model_dir: ${paths.root_dir}/models/${project.name}_${paths.preprocess.crop_suffix}/${model.arch}_${model.encoder}

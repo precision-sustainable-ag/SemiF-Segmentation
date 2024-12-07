@@ -79,7 +79,7 @@ def main(cfg: DictConfig):
     val_loader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=False, num_workers=cfg.dataset.num_workers)
     
     sample_dataloader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=True, num_workers=cfg.dataset.num_workers)
-    viz_batch(sample_dataloader, output_dir=logger.log_dir)\
+    viz_batch(sample_dataloader, output_dir=logger.log_dir)
     
     del sample_dataloader
 
@@ -105,7 +105,7 @@ def main(cfg: DictConfig):
         strategy=train_strategy,
         callbacks=[best_checkpoint, last_checkpoint],
         logger=logger,
-        num_nodes=len(nodes)
+        # num_nodes=len(nodes)
     )
     trainer.fit(model, train_loader, val_loader)
     

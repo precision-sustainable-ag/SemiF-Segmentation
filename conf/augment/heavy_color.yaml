@@ -4,11 +4,11 @@ train:
   
   horizontal_flip: 
     enable: true
-    p: 0.45
+    p: 0.15
 
   vertical_flip: 
     enable: true
-    p: 0.45
+    p: 0.15
 
 # https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.OpticalDistortion
   optical_distortion: 
@@ -34,7 +34,7 @@ train:
     p: 0.05
   
   gauss_noise: 
-    enable: false
+    enable: true
     noise_scale_factor: .2 # Scaling factor for noise generation. Value should be in the range (0, 1]. Smaller is faster.
     p: 0.15 
   
@@ -48,8 +48,9 @@ train:
     enable: true
     transforms:
       - CLAHE
+      - RandomBrightnessContrast
       - RandomGamma
-    p: 0.1
+    p: 0.9
   
   blur_transforms:
     enable: true
@@ -61,33 +62,33 @@ train:
     p: 0.15
   
   hue_saturation:
-    enable: false
+    enable: true
     transforms:
       - RandomBrightnessContrast
       - HueSaturationValue
-    brightness_limit: [-0.2,0.2]
-    contrast_limit: [-0.2,0.2]  
-    hue_shift_limit: [-30,30]
-    sat_shift_limit: [-30,30]
-    val_shift_limit: [-30,30]
+    brightness_limit: [-0.4,0.4]
+    contrast_limit: [-0.4,0.4]  
+    hue_shift_limit: [-50,50]
+    sat_shift_limit: [-50,50]
+    val_shift_limit: [-20,20]
     p: 0.9
 
   # Color noise
   noise_transforms:
-    enable: false
-    one_of_p: 0.5
+    enable: true
+    one_of_p: 0.8
     transforms:
       GaussNoise:
-        var_limit_min: 5
-        var_limit_max: 15
+        var_limit_min: 10
+        var_limit_max: 50
         noise_scale_factor: 0.1
-        p: 0.4
+        p: 0.7
       ISONoise:
         color_shift_min: 0.2
-        color_shift_max: 0.3
+        color_shift_max: 0.5
         intensity_min: 0.2
-        intensity_max: 0.3
-        p: 0.4
+        intensity_max: 0.5
+        p: 0.7
 
 val:
   img_hw: ${augment.train.img_hw}

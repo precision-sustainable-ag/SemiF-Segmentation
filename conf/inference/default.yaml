@@ -4,30 +4,28 @@ subname: CCCamImages
 input_dir: "data/CCCamImages/images"
 # input_dir: "data/COMBINED_VEG_TEST/train_val_test_256x256/test/images"
 
-version: 0
+version: 4
 
 rescale_factor: .75
 threshold: 0.75
 use_normalization: true
 
-cuda_visible_devices:
-  enable: true
-  devices: 5
+cuda_visible_devices: [5]
 
-samplek: 20
+samplek: 10
 
 seed: 42
 
-mean:
-  - 0.39847057407541153
-  - 0.3801075789029128
-  - 0.293452011562886
+mean: 
+  - 0.41359323636007883
+  - 0.3630233380560909
+  - 0.3157344799924196
 std:
-  - 0.1861412859826447
-  - 0.1825776729079864
-  - 0.1531887242997391
+  - 0.1193212211964802
+  - 0.11448691093594061
+  - 0.09600069526132719
 
-inference_root: ${project.output_dir}/${project.subname}/${inference.mode}/${inference.subname}
+inference_root: ${project.output_dir}/${inference.subname}/version_${inference.version}
 inf_scaled_thresh: scaled_${inference.rescale_factor}_thresh_${inference.threshold}_norm_${inference.use_normalization}
 
 inf_output_dir: ${inference.inference_root}/${inference.inf_scaled_thresh}
@@ -35,3 +33,13 @@ inf_output_dir: ${inference.inference_root}/${inference.inf_scaled_thresh}
 plot:
   dpi: 300
   transparent: true
+
+CCCamImages:
+  mean: 
+    - 0.41359323636007883
+    - 0.3630233380560909
+    - 0.3157344799924196
+  std:
+    - 0.1193212211964802
+    - 0.11448691093594061
+    - 0.09600069526132719

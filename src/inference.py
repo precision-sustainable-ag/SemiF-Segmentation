@@ -211,7 +211,7 @@ class InferencePipeline:
     """Manages the end-to-end inference pipeline."""
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
-        self.model_checkpoint = Path(cfg.project.output_dir, cfg.project.subname, f"version_{cfg.inference.version}", "checkpoints", "best.ckpt")
+        self.model_checkpoint = Path(cfg.paths.inference.checkpoints, "best.ckpt")
         
         self.image_dir = Path(cfg.inference.input_dir)
         assert self.image_dir.exists(), f"Input directory not found: {self.image_dir}"
@@ -261,14 +261,15 @@ def copy_hydra_config_to_subfolder(cfg : DictConfig):
 
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
-    if cfg.inference.cuda_visible_devices.enable:
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(cfg.inference.cuda_visible_devices.devices)
+    nodes = cfg.inference.cuda_visible_devices
+    devices_str = ",".join(map(str, nodes))
+    os.environ['CUDA_VISIBLE_DEVICES'] = devices_str
     
-    copy_hydra_config_to_subfolder(cfg)
-
     random.seed(cfg.inference.seed)
     pipeline = InferencePipeline(cfg)
     pipeline.run()
+
+    copy_hydra_config_to_subfolder(cfg)
 
 if __name__ == "__main__":
     main()

@@ -1,11 +1,11 @@
 mode: train
-epochs: 3
-batch_size: 8
-augments: basic
+epochs: 50
+batch_size: 12
+augment: basic
 
-train_strategy: auto # auto or ddp
+train_strategy: ddp # auto or ddp
 
-cuda_visible_devices: [1]
+cuda_visible_devices: [1,2]
 
 trainer:
   max_epochs: ${train.epochs}
