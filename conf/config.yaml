@@ -10,7 +10,7 @@ defaults:
   - _self_                   # Ensures overriding behavior
 
 project:
-  name: "SEMIF_TEST"
+  name: "SEMIF"
   subname: ${dataset.data_name}
   output_dir: ${hydra:runtime.cwd}/projects/${project.name}/${mode}
 

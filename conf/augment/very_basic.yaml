@@ -10,12 +10,6 @@ train:
     enable: true
     p: 0.45
 
-# https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.OpticalDistortion
-  optical_distortion: 
-    enable: true
-    distort_limit: [-0.05,0.05]
-    p: 0.15
-  
   # https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.ShiftScaleRotate
   shift_scale_rotate:
     enable: true
@@ -24,35 +18,41 @@ train:
     shift_limit: [-0.0625,0.0625]
     border_mode: 0
     p: 0.15
+
+# https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.OpticalDistortion
+  optical_distortion: 
+    enable: false
+    distort_limit: [-0.05,0.05]
+    p: 0.15
   
   padding: 
     enable: false
     p: 0.15
 
   random_crop: 
-    enable: true
+    enable: false
     p: 0.05
   
   gauss_noise: 
-    enable: true
+    enable: false
     noise_scale_factor: .2 # Scaling factor for noise generation. Value should be in the range (0, 1]. Smaller is faster.
     p: 0.15 
   
   # https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.Perspective
   perspective: 
-    enable: true
+    enable: false
     scale: [0.05, 0.1]
     p: 0.15
 
   color_transforms:
-    enable: true
+    enable: false
     transforms:
       - CLAHE
       - RandomGamma
     p: 0.1
   
   blur_transforms:
-    enable: true
+    enable: false
     transforms:
       - Sharpen # https://albumentations.ai/docs/api_reference/augmentations/transforms/?h=sharpen#albumentations.augmentations.transforms.Sharpen
       - Blur
@@ -61,7 +61,7 @@ train:
     p: 0.15
   
   hue_saturation:
-    enable: true
+    enable: false
     transforms:
       - RandomBrightnessContrast
       - HueSaturationValue
@@ -74,7 +74,7 @@ train:
 
   # Color noise
   noise_transforms:
-    enable: true
+    enable: false
     one_of_p: 0.5
     transforms:
       GaussNoise:

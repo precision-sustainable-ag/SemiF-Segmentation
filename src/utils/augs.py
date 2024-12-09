@@ -44,11 +44,9 @@ def train_aug(cfg):
         color_augs = []
         for aug in cfg.augment.train.color_transforms.transforms:
             if aug == "CLAHE":
-                color_augs.append(A.CLAHE(p=1))
-            elif aug == "RandomBrightnessContrast":
-                color_augs.append(A.RandomBrightnessContrast(p=1))
+                color_augs.append(A.CLAHE(p=.5))
             elif aug == "RandomGamma":
-                color_augs.append(A.RandomGamma(p=1))
+                color_augs.append(A.RandomGamma(p=.5))
         train_transform.append(A.OneOf(color_augs, p=cfg.augment.train.color_transforms.p))
 
     # Add distortion transformations
@@ -90,6 +88,30 @@ def train_aug(cfg):
                         val_shift_limit=hs_cfg.val_shift_limit,
                         p=1))
         train_transform.append(A.OneOf(hue_augs, p=cfg.augment.train.hue_saturation.p))
+
+    # Add noise transformations
+    if cfg.augment.train.noise_transforms.enable:
+        noise_augs = []
+        for aug, vals in cfg.augment.train.noise_transforms.transforms.items():
+            if aug == "MultiplicativeNoise":
+                noise_augs.append(A.MultiplicativeNoise(multiplier=vals["multiplier"], per_channel=vals["per_channel"], p=vals["p"]))
+            elif aug == "JpegCompression":
+                noise_augs.append(A.JpegCompression(quality_lower=vals["quality_lower"], quality_upper=vals["quality_upper"], p=vals["p"]))
+            elif aug == "Downscale":
+                noise_augs.append(A.Downscale(scale_min=vals["scale_min"], scale_max=vals["scale_max"], p=vals["p"]))
+            elif aug == "GridDistortion":
+                noise_augs.append(A.GridDistortion(num_steps=vals["num_steps"], distort_limit=vals["distort_limit"], p=vals["p"]))
+            elif aug == "ElasticTransform":
+                noise_augs.append(A.ElasticTransform(alpha=vals["alpha"], sigma=vals["sigma"], alpha_affine=vals["alpha_affine"], p=vals["p"]))
+            elif aug == "GaussNoise":
+                noise_augs.append(A.GaussNoise(var_limit=(vals["var_limit_min"], vals["var_limit_max"]), p=vals["p"]))
+            elif aug == "ISONoise":
+                noise_augs.append(A.ISONoise(color_shift=(vals["color_shift_min"], vals["color_shift_max"]), intensity=(vals["intensity_min"], vals["intensity_max"]), p=vals["p"]))
+        train_transform.append(A.OneOf(noise_augs, p=cfg.augment.train.noise_transforms.one_of_p))
+    
+    if cfg.augment.train.perspective.enable:
+        p_cfg = cfg.augment.train.perspective
+        train_transform.append(A.Perspective(p=p_cfg.p, scale=p_cfg.scale))
 
     return A.Compose(train_transform)
 
