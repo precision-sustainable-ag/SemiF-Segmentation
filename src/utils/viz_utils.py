@@ -111,6 +111,8 @@ def viz_batch(dataloader, output_dir="output"):
             # Convert the image to HWC format (CHW -> HWC) for visualization
         
             image = images[idx].permute(1, 2, 0).numpy()  # CHW -> HWC
+            # Clip the image data to the valid range [0, 1]
+            image = np.clip(image, 0, 1)
             
             # Convert the mask to 2D format for visualization
             mask = masks[idx].squeeze(0).numpy()  # Remove channel dimension

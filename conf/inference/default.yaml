@@ -1,18 +1,21 @@
 mode: inference
 
-subname: CCCamImages
-input_dir: "data/CCCamImages/images"
+# subname: CCCamImages
+subname: SEMIF
+# input_dir: "data/CCCamImages/images"
+input_dir: "data/SEMIF/images"
+# input_dir: "data/FIELD/images"
 # input_dir: "data/COMBINED_VEG_TEST/train_val_test_256x256/test/images"
 
-version: 4
+version: 22
 
 rescale_factor: .75
-threshold: 0.75
+threshold: 0.95
 use_normalization: true
 
 cuda_visible_devices: [5]
 
-samplek: 10
+samplek: 5
 
 seed: 42
 
@@ -25,7 +28,7 @@ std:
   - 0.11448691093594061
   - 0.09600069526132719
 
-inference_root: ${project.output_dir}/${inference.subname}/version_${inference.version}
+inference_root: ${project.output_dir}/${inference.subname}/version_${inference.version}/${job_now_date}_${job_now_time}
 inf_scaled_thresh: scaled_${inference.rescale_factor}_thresh_${inference.threshold}_norm_${inference.use_normalization}
 
 inf_output_dir: ${inference.inference_root}/${inference.inf_scaled_thresh}
