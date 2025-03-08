@@ -1,5 +1,13 @@
 # SemiF-Segmentation
 
+## Installing Pytorch on Grace-hopper
+
+1. Create a conda environment (python >=3.10)
+2. Install torch and torchvision
+    ```bash
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+    ```
+
 ### **Script Descriptions**
 
 #### **1. `move_fullsized_data.py`**
