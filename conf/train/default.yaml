@@ -1,11 +1,11 @@
 mode: train
 epochs: 50
-batch_size: 16
-augment: basic
+batch_size: 32
+augment: lighting
 
 train_strategy: ddp # auto or ddp
 
-cuda_visible_devices: [1,2,3]
+cuda_visible_devices: [5,6,7]
 
 trainer:
   max_epochs: ${train.epochs}
@@ -13,7 +13,7 @@ trainer:
   log_every_n_steps: 1
   enable_model_summary: true
   num_sanity_val_steps: 0
-  deterministic: false  # true for binary, false for multiclass
+  deterministic: true  # true for binary, false for multiclass
   
 callbacks:
   monitor: valid_dataset_iou

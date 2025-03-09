@@ -65,7 +65,7 @@ train:
     p: 0.9
 
 val:
-  img_hw: [${augment.train.img_hw}, ${augment.train.img_hw}]
+  img_hw: ${augment.train.img_hw}
   padding:
     enable: true
     p: 0.25

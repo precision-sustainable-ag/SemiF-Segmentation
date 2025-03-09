@@ -99,6 +99,7 @@ class CropProcessor:
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     log.info("Cropping images and masks")
+    
     processor = CropProcessor(
         image_folder=cfg.paths.preprocess.image_dir,
         mask_folder=cfg.paths.preprocess.mask_dir,

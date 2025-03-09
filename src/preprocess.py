@@ -11,6 +11,8 @@ from src.preprocessing.grid_crop import main as grid_crop
 from src.preprocessing.train_val_test_split import main as train_val_test_split
 from src.preprocessing.remap_masks import main as remap_masks
 from src.preprocessing.data_stats import main as data_stats
+from src.preprocessing.move_fullsized_data import main as move_fullsized_data
+from src.preprocessing.remove_nontargets import main as remove_nontargets
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +22,8 @@ TASK_REGISTRY = {
     "train_val_test_split": train_val_test_split,
     "remap_masks": remap_masks,
     "data_stats": data_stats,
+    "move_fullsized_data": move_fullsized_data,
+    "remove_nontargets": remove_nontargets
     # Add more tasks here as needed
 }
 

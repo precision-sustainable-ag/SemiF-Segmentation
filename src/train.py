@@ -97,7 +97,7 @@ def main(cfg: DictConfig):
     if cfg.train.train_strategy == "auto":
         train_strategy = "auto"
     elif cfg.train.train_strategy == "ddp":
-        train_strategy = DDPStrategy(find_unused_parameters=True)
+        train_strategy = DDPStrategy(find_unused_parameters=False)
     
     # Trainer
     trainer = Trainer(

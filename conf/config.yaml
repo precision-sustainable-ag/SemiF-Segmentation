@@ -2,7 +2,7 @@ defaults:
   - paths: default           # Default paths config
   # Training configs
   - dataset: combined_veg       # Default dataset config
-  - augment: basic  # Default augmentations config
+  - augment: lighting  # Default augmentations config
   - train: default         # Train config
   - model: deeplabv3plus         # Model config
   - inference: default      # Inference config
@@ -10,7 +10,7 @@ defaults:
   - _self_                   # Ensures overriding behavior
 
 project:
-  name: "SEMIF"
+  name: SEMIF_512
   subname: ${dataset.data_name}
   output_dir: ${hydra:runtime.cwd}/projects/${project.name}/${mode}
 

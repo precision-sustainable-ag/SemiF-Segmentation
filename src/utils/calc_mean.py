@@ -7,7 +7,6 @@ import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import json
-from src.utils.class_groupings import CLASSGROUPS
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import Manager
 from concurrent.futures import ProcessPoolExecutor
@@ -139,40 +138,40 @@ def process_masks(mask_files, num_workers=12):
 
     return combined_unique_values, combined_class_frequencies
 
-def plot_class_distributions(class_frequencies, title, group_name, output_dir=None):
-    classes = list(class_frequencies.keys())
-    frequencies = list(class_frequencies.values())
-
-    clsint_to_str = {cls_value: str_cls for str_cls, cls_dict in CLASSGROUPS[group_name].items() for cls_value in classes if cls_value == cls_dict["values"]}
-
-    class_names = [clsint_to_str[cls] for cls in classes]
-
-    plt.figure(figsize=(10, 5))
-    plt.bar(class_names, frequencies)
-    plt.xlabel('Classes')
-    plt.gca().get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
-    plt.ylabel('Frequencies')
-    plt.title(title)
-    plt.xticks(class_names)
-    if output_dir:
-        filename = title.lower().replace(' ', '_') + '.png'
-        plt.savefig(output_dir / filename)
-
-
-
 def main():
     log.info("Starting data statistics calculation...")
 
     # Get image files for mean and std calculation
-    train_image_dir = Path("/home/mkutuga/SemiF-Segmentation/data/CCCamImages/images")
+    train_image_dir = Path("/home/mkutuga/SemiF-Segmentation/projects/SEMIF/preprocess/data/train_val_test_1024x1024/train/images")
     train_image_files = list(train_image_dir.glob("*.jpg"))
 
     # Calculate and save RGB mean and std
     mean, std = calculate_rgb_mean_std_shared(train_image_files, num_workers=18)
     log.info(f"Calculated Mean: {mean}, Std: {std}")
     # Save results
-    output_file = "rgb_mean_std.json"
+    output_file = "rgb_mean_std_train.json"
     save_mean_std(mean, std, output_file)
 
+    # Get image files for mean and std calculation
+    train_image_dir = Path("/home/mkutuga/SemiF-Segmentation/projects/SEMIF/preprocess/data/train_val_test_1024x1024/val/images")
+    train_image_files = list(train_image_dir.glob("*.jpg"))
+
+    # Calculate and save RGB mean and std
+    mean, std = calculate_rgb_mean_std_shared(train_image_files, num_workers=18)
+    log.info(f"Calculated Mean: {mean}, Std: {std}")
+    # Save results
+    output_file = "rgb_mean_std_val.json"
+    save_mean_std(mean, std, output_file)
+
+    # Get image files for mean and std calculation
+    train_image_dir = Path("/home/mkutuga/SemiF-Segmentation/projects/SEMIF/preprocess/data/train_val_test_1024x1024/test/images")
+    train_image_files = list(train_image_dir.glob("*.jpg"))
+
+    # Calculate and save RGB mean and std
+    mean, std = calculate_rgb_mean_std_shared(train_image_files, num_workers=18)
+    log.info(f"Calculated Mean: {mean}, Std: {std}")
+    # Save results
+    output_file = "rgb_mean_std_test.json"
+    save_mean_std(mean, std, output_file)
 if __name__ == "__main__":
     main()

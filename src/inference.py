@@ -20,12 +20,6 @@ from src.utils.model import SegmentationModule
 
 log = logging.getLogger(__name__)
 
-def load_mean_std_from_json(json_file):
-    with open(json_file, "r") as f:
-        data = json.load(f)
-    mean = np.array(data["mean"])
-    std = np.array(data["std"])
-    return mean, std
 
 class MaskSaver:
     """Handles saving predicted masks and comparison plots."""
@@ -45,7 +39,7 @@ class MaskSaver:
 
         image_paths = sorted(Path(image_dir).glob("*.jpg"))
         if samplek:
-            image_paths = random.sample(image_paths, samplek)
+            image_paths = random.sample(image_paths, samplek) if len(image_paths) > samplek else image_paths
             log.info(f"Sampling {samplek} images for inference.")
 
         # Initialize the dataframe to store inference statistics
@@ -55,10 +49,16 @@ class MaskSaver:
 
             image, original_size, rescaled_size, load_time, preprocess_time = self._preprocess_image(image_path)
             
+            if image is None:
+                log.error(f"Error processing image: {image_path}")
+                continue
             
             # Predict the mask
             mask, inference_time = self._predict_mask(image, out_classes)
-            mask_filename = mask_output_dir / f"{image_path.stem}_mask.png"
+            # Resize the predicted mask back to the original image size
+            original_height, original_width = original_size
+            mask = cv2.resize(mask, (original_width, original_height), interpolation=cv2.INTER_NEAREST)
+            mask_filename = mask_output_dir / f"{image_path.stem}.png"
             if out_classes == 1:
                 cv2.imwrite(str(mask_filename), mask * 255)
             else:
@@ -96,20 +96,23 @@ class MaskSaver:
         start_time = time.time()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         original_size = image.shape[:2]
+        height, width = original_size
 
         if self.rescale_factor != 1:
-            height, width = image.shape[:2]
             new_height = int(height * self.rescale_factor)
             new_width = int(width * self.rescale_factor)
-            new_height = (new_height // 32) * 32
-            new_width = (new_width // 32) * 32
+            # Ensure the new dimensions are divisible by 32 and at least 32
+            new_height = max((new_height // 32) * 32, 32)
+            new_width = max((new_width // 32) * 32, 32)
             image = cv2.resize(image, (new_width, new_height))
-        elif self.rescale_factor == 1:
-            height, width = image.shape[:2]
+        else:  # when rescale_factor == 1
             if height % 32 != 0 or width % 32 != 0:
-                new_height = (height // 32) * 32
-                new_width = (width // 32) * 32
-                image = cv2.resize(image, (new_width, new_height))
+                new_height = max((height // 32) * 32, 32)
+                new_width = max((width // 32) * 32, 32)
+                try:
+                    image = cv2.resize(image, (new_width, new_height))
+                except Exception as e:
+                    return None, None, None, None, None
         
         rescaled_size = image.shape[:2]
         if self.use_normalization:
@@ -130,7 +133,8 @@ class MaskSaver:
             inference_time = end_time - start_time
             if out_classes == 1:
                 probabilities = torch.sigmoid(logits).squeeze().cpu().numpy()
-                return (probabilities > self.threshold).astype(np.uint8), inference_time
+                mask = (probabilities > self.threshold).astype(np.uint8)
+                return mask, inference_time
             elif out_classes == 3:
                 pred_masks_softmax = torch.softmax(logits, dim=1)
                 # This maybe wrong, need to check
@@ -156,7 +160,9 @@ class MaskSaver:
         }
         
         for image_path in tqdm(image_paths):
-            mask_path = Path(mask_dir) / f"{image_path.stem}_mask.png"
+            mask_path = Path(mask_dir) / f"{image_path.stem}.png"
+            if not mask_path.exists():
+                continue
             image = cv2.imread(str(image_path))
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)

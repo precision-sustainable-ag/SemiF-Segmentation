@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import shutil
 from typing import List, Dict, Union
 import hydra
@@ -46,18 +46,25 @@ class DatasetManager:
         """Load image and mask paths."""
         self.images = self.collect_paths("images", ".jpg")
         self.masks = self.collect_paths("meta_masks/semantic_masks", ".png")
+        self.metadata = self.collect_paths("metadata", ".json")
 
-    def copy_files(self, files: List[Path], destination_subdir: str):
+    @staticmethod
+    def copy_file(file_path: Path, dest_dir: Path):
+        """Static method to copy a single file."""
+        dest_path = dest_dir / file_path.name
+        log.info(f"Copying {file_path} to {dest_path}")
+        shutil.copy(file_path, dest_path)
+
+    def copy_files(self, files: List[Path], destination_subdir: str, parallel: bool = True):
         """Copy files to a destination subdirectory."""
         dest_dir = self.destination_dir / destination_subdir
         dest_dir.mkdir(parents=True, exist_ok=True)
-
-        def copy_file(file_path: Path):
-            dest_path = dest_dir / file_path.name
-            shutil.copy(file_path, dest_path)
-
-        with ThreadPoolExecutor(max_workers=12) as executor:
-            executor.map(copy_file, files)
+        if parallel:
+            with ProcessPoolExecutor(max_workers=12) as executor:
+                executor.map(self.copy_file, files, [dest_dir] * len(files))
+        else:
+            for file in files:
+                self.copy_file(file, dest_dir)
 
     def filter_common_files(self, image_dir: str, mask_dir: str):
         """Filter images and masks to keep only matching filenames."""
@@ -104,19 +111,21 @@ def main(cfg: DictConfig):
     log.info("Moving full-sized images and masks")
     manager = DatasetManager(
         project_name=cfg.project.name,
-        query_result=cfg.preprocess.move_data.query_result,
+        query_result=cfg.preprocess.move_fullsized_data.query_result,
         primary_storage=cfg.paths.primary_storage,
         secondary_storage=cfg.paths.secondary_storage,
         destination_dir=cfg.paths.data_dir,
-        remove_unmatched=cfg.preprocess.move_data.remove_unmatched
+        remove_unmatched=cfg.preprocess.move_fullsized_data.remove_unmatched
     )
 
     manager.load_images_and_masks()
     log.info(f"Images count: {len(manager.images)}")
     log.info(f"Masks count: {len(manager.masks)}")
+    log.info(f"Metadata count: {len(manager.metadata)}")
     log.info("Copying files to the destination directory")
     manager.copy_files(manager.images, destination_subdir="images")
     manager.copy_files(manager.masks, destination_subdir="masks")
+    manager.copy_files(manager.metadata, destination_subdir="metadata", parallel=False)
     log.info("Filtering common files")
     manager.filter_common_files(image_dir="images", mask_dir="masks")
     log.info("Moving complete")

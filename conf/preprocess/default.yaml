@@ -1,22 +1,26 @@
 mode: preprocess
 
 tasks:
-  move_data: false
-  grid_crop: true # successfully tested
+  move_fullsized_data: false
+  remove_nontargets: false
+  grid_crop: false # successfully tested
   train_val_test_split: true # successfully tested
   remap_masks: true # successfully tested
-  data_stats: true # successfully tested
+  data_stats: false # successfully tested
   viz_results: false
 
-data_dir: ${paths.root_dir}/data/SEMIF
+data_dir: ${paths.root_dir}/data/SYNTHETIC_HV_CC
 
-move_data:
-  query_result: /home/mkutuga/SemiF-ImageCuration/balanced_dataset.json
+move_fullsized_data:
+  query_result: data/balanced_dataset.json
   remove_unmatched: True # remove images that do not have masks and vice-versa
 
+remove_nontargets:
+  remove_colorchecker: True
+
 grid_crop:
-  crop_height: 1024
-  crop_width: 1024
+  crop_height: 512
+  crop_width: 512
 
 train_val_test_split:
   train_size:  # not used, train_size is calculated from val_size and test_size
@@ -27,11 +31,11 @@ train_val_test_split:
   remove_cropped_data: True
   
   model_testing: # quick and dirty way to generate a small dataset, not recommended for final results
-    status: true
+    status: false
     factor: 0.01
 
 remap_masks:
-  group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
+  group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
   process_concurrently: True
 
 data_stats:

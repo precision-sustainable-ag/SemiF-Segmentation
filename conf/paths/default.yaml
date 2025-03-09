@@ -14,6 +14,8 @@ preprocess:
   # path to original data
   image_dir: ${preprocess.data_dir}/images
   mask_dir: ${preprocess.data_dir}/masks
+  non_targets_removed_masks_dir: ${preprocess.data_dir}/non_targets_removed_masks
+  metadata_dir: ${preprocess.data_dir}/metadata
 
   # path to cropped data
   crop_suffix: ${preprocess.grid_crop.crop_height}x${preprocess.grid_crop.crop_width}
