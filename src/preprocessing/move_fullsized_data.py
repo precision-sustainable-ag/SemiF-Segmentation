@@ -6,16 +6,18 @@ from typing import List, Dict, Union
 import hydra
 from omegaconf import DictConfig
 import logging
-
+from tqdm import tqdm   
 log = logging.getLogger(__name__)
 
 class DatasetManager:
-    def __init__(self, project_name: str, query_result: str, primary_storage: str, secondary_storage: str, destination_dir: str, remove_unmatched: bool = False):
-        self.query_result = Path(query_result)
-        self.primary_storage = Path(primary_storage, "semifield-developed-images")
-        self.secondary_storage = Path(secondary_storage, "semifield-developed-images")
-        self.destination_dir = Path(destination_dir, project_name)
-        self.remove_unmatched = remove_unmatched
+    def __init__(self, cfg: DictConfig):
+        self.query_result = Path(cfg.preprocess.move_fullsized_data.query_result)
+        self.primary_storage = Path(cfg.paths.primary_storage, "semifield-developed-images")
+        self.secondary_storage = Path(cfg.paths.secondary_storage, "semifield-developed-images")
+        self.tertiary_storage = Path(cfg.paths.tertiary_storage, "semifield-developed-images")
+
+        self.destination_dir = Path(cfg.paths.data_dir, cfg.project.name)
+        self.remove_unmatched = cfg.preprocess.move_fullsized_data.remove_unmatched
         self.data = self.load_data()
         self.images = []
         self.masks = []
@@ -25,29 +27,37 @@ class DatasetManager:
         with self.query_result.open('r') as file:
             return json.load(file)
 
-    def collect_paths(self, subdir: str, file_extension: str) -> List[Path]:
-        """Collect file paths for images or masks."""
-        collected_paths = []
-        for record in self.data:
+    def collect_paths(self) -> List[Path]:
+        """Collect file paths for images, masks, and metadata, ensuring all three are present."""
+        images, masks, metadata = [], [], []
+        storage_paths = [self.primary_storage, self.secondary_storage, self.tertiary_storage]
+
+        for record in tqdm(self.data):
             batch = record["batch_id"]
             image_id = record["image_id"]
-            primary_path = self.primary_storage / batch / subdir / f"{image_id}{file_extension}"
-            secondary_path = self.secondary_storage / batch / subdir / f"{image_id}{file_extension}"
 
-            if primary_path.exists():
-                collected_paths.append(primary_path)
-            elif secondary_path.exists():
-                collected_paths.append(secondary_path)
-            else:
-                print(f"File not found: {primary_path}")
-        return collected_paths
+            found = False
+            for storage in storage_paths:
+                image_path = storage / batch / "images" / f"{image_id}.jpg"
+                mask_path = storage / batch / "meta_masks/semantic_masks" / f"{image_id}.png"
+                metadata_path = storage / batch / "metadata" / f"{image_id}.json"
+
+                if image_path.exists() and mask_path.exists() and metadata_path.exists():
+                    images.append(image_path)
+                    masks.append(mask_path)
+                    metadata.append(metadata_path)
+                    found = True
+                    break
+
+            if not found:
+                log.warning(f"File set not found for image_id: {image_id}")
+
+        return images, masks, metadata
 
     def load_images_and_masks(self):
-        """Load image and mask paths."""
-        self.images = self.collect_paths("images", ".jpg")
-        self.masks = self.collect_paths("meta_masks/semantic_masks", ".png")
-        self.metadata = self.collect_paths("metadata", ".json")
-
+        """Load image, mask, and metadata paths, ensuring all three are present."""
+        self.images, self.masks, self.metadata = self.collect_paths()
+        
     @staticmethod
     def copy_file(file_path: Path, dest_dir: Path):
         """Static method to copy a single file."""
@@ -109,14 +119,7 @@ class DatasetManager:
 def main(cfg: DictConfig):
 
     log.info("Moving full-sized images and masks")
-    manager = DatasetManager(
-        project_name=cfg.project.name,
-        query_result=cfg.preprocess.move_fullsized_data.query_result,
-        primary_storage=cfg.paths.primary_storage,
-        secondary_storage=cfg.paths.secondary_storage,
-        destination_dir=cfg.paths.data_dir,
-        remove_unmatched=cfg.preprocess.move_fullsized_data.remove_unmatched
-    )
+    manager = DatasetManager(cfg)
 
     manager.load_images_and_masks()
     log.info(f"Images count: {len(manager.images)}")

@@ -77,7 +77,7 @@ class MaskProcessor:
 class SplitDirectoryProcessor:
     """Class to process train, val, and test directories of image masks."""
 
-    def __init__(self, split_dirs, group_name, process_concurrently=True):
+    def __init__(self, cfg: DictConfig):
         """
         Initialize the SplitDirectoryProcessor.
 
@@ -85,75 +85,56 @@ class SplitDirectoryProcessor:
         :param group_name: Mapping group for remapping masks.
         :param process_concurrently: Whether to process images concurrently.
         """
-        self.split_dirs = split_dirs
-        self.group_name = group_name
-        self.process_concurrently = process_concurrently
-        self.mask_processor = MaskProcessor(group_name)
+        self.group_name=cfg.preprocess.remap_masks.group_name
+        self.process_concurrently=cfg.preprocess.remap_masks.process_concurrently
 
-    def ensure_directories_exist(self):
-        """Ensure all output directories exist."""
-        for _, dirs in self.split_dirs.items():
-            Path(dirs["remapped_mask_dir"]).mkdir(parents=True, exist_ok=True)
+        self.mask_processor = MaskProcessor(self.group_name)
+
+        if Path(cfg.paths.cropped_mask_dir).exists():
+            self.mask_dir = Path(cfg.paths.cropped_mask_dir)
+            
+            
+        elif Path(cfg.paths.project_mode_dir, "data", "masks").exists():
+            self.mask_dir = Path(cfg.paths.project_mode_dir, "data", "masks")
+    
+        else:
+            raise FileNotFoundError(
+                "No valid mask directory found. Please check your configuration."
+            )
+        self.remapped_mask_dir = Path(str(self.mask_dir) + "_remapped")
+        self.remapped_mask_dir.mkdir(parents=True, exist_ok=True)
 
     def get_image_paths(self, input_dir: str):
         """Get paths to all valid images in the input directory."""
         return [str(p) for p in Path(input_dir).glob("*.png")] 
 
-    def process_split(self, split_name: str, input_dir: str, output_dir: str):
+    def process(self):
         """Process a single data split."""
-        log.info(f"Processing {split_name} masks.")
-        image_paths = self.get_image_paths(input_dir)
+
+        mask_paths = self.get_image_paths(self.mask_dir)
 
         if self.process_concurrently:
-            log.info(f"Processing {split_name} masks concurrently.")
-            available_cpus = max(int(len(os.sched_getaffinity(0)) / 4), 1)
+
+            available_cpus = 28
             with concurrent.futures.ThreadPoolExecutor(max_workers=available_cpus) as executor:
                 futures = [
-                    executor.submit(self.mask_processor.process_image, img_path, output_dir)
-                    for img_path in image_paths
+                    executor.submit(self.mask_processor.process_image, img_path, self.remapped_mask_dir)
+                    for img_path in mask_paths
                 ]
                 concurrent.futures.wait(futures)
         else:
-            log.info(f"Processing {split_name} masks sequentially.")
-            for img_path in image_paths:
-                self.mask_processor.process_image(img_path, output_dir)
 
-    def process_splits(self):
-        """Process all splits (train, val, test)."""
-        self.ensure_directories_exist()
-
-        for split_name, dirs in self.split_dirs.items():
-            input_dir = dirs["mask_dir"]
-            output_dir = dirs["remapped_mask_dir"]
-            self.process_split(split_name, input_dir, output_dir)
+            for mask_path in mask_paths:
+                self.mask_processor.process_image(mask_path, self.remapped_mask_dir)
 
 
 @hydra.main(version_base="1.3", config_path="configs", config_name="split_mask_processing_config")
 def main(cfg: DictConfig):
     log.info("Starting mask processing for train, val, and test splits.")
-    split_dir = Path(cfg.paths.preprocess.split_data.split_dir)
-    split_dirs = {
-        "train": {
-            "mask_dir": split_dir / "train" / "masks",
 
-            "remapped_mask_dir": split_dir / "train" / "remapped_masks",
-        },
-        "val": {
-            "mask_dir": split_dir / "val" / "masks",
-            "remapped_mask_dir": split_dir / "val" / "remapped_masks",
-        },
-        "test": {
-            "mask_dir": split_dir / "test" / "masks",
-            "remapped_mask_dir": split_dir / "test" / "remapped_masks",
-        },
-    }
-
-    processor = SplitDirectoryProcessor(
-        split_dirs=split_dirs,
-        group_name=cfg.preprocess.remap_masks.group_name,
-        process_concurrently=cfg.preprocess.remap_masks.process_concurrently,
-    )
-    processor.process_splits()
+    processor = SplitDirectoryProcessor(cfg)
+        
+    processor.process()
     log.info("Mask processing complete for all splits.")
 
 
