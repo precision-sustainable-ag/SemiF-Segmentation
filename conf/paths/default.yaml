@@ -2,6 +2,13 @@
 # this relys on main.py to be run from the project root
 root_dir: ${hydra:runtime.cwd}
 
+project_dir: ${paths.root_dir}/projects/${project.name}
+project_mode_dir: ${paths.project_dir}/${mode}
+project_query_dir: ${paths.project_dir}/query
+project_preprocess_dir: ${paths.project_dir}/preprocess
+project_train_dir: ${paths.project_dir}/train
+project_inference_dir: ${paths.project_dir}/inference
+
 # path to data directory
 data_dir: ${paths.root_dir}/data
 
@@ -9,37 +16,37 @@ data_dir: ${paths.root_dir}/data
 # NCSU Storage lockers
 primary_storage: /mnt/research-projects/s/screberg/longterm_images
 secondary_storage: /mnt/research-projects/s/screberg/GROW_DATA
+tertiary_storage: /mnt/research-projects/s/screberg/longterm_images2
 
-preprocess:
-  # path to original data
-  image_dir: ${preprocess.data_dir}/images
-  mask_dir: ${preprocess.data_dir}/masks
+inference_output_dir: ${paths.project_inference_dir}/${inference.subname}/version_${inference.version}/${job_now_date}_${job_now_time}
 
-  # path to cropped data
-  crop_suffix: ${preprocess.grid_crop.crop_height}x${preprocess.grid_crop.crop_width}
-  cropped_image_dir: ${project.output_dir}/data/cropped_images_${paths.preprocess.crop_suffix}
-  cropped_mask_dir: ${project.output_dir}/data/cropped_masks_${paths.preprocess.crop_suffix}
+# path to cropped data
+crop_suffix: ${preprocess.grid_crop.crop_height}x${preprocess.grid_crop.crop_width}
+cropped_image_dir: ${paths.project_preprocess_dir}/data/cropped_images_${paths.crop_suffix}
+cropped_mask_dir: ${paths.project_preprocess_dir}/data/cropped_masks_${paths.crop_suffix}
 
-  # path to split data
-  split_data:
-    split_dir: ${project.output_dir}/data/train_val_test_${paths.preprocess.crop_suffix}
-    
-    datasets:
-      - train
-      - val
-      - test
+# path to split data
+split_dir: ${paths.project_preprocess_dir}/data/train_val_test_${paths.crop_suffix}
 
-    dataset_subdirs:
-      - images
-      - masks
-      - remapped_masks
-  
-train:
-  split_data:
-    split_dir: ${hydra:runtime.cwd}/projects/${project.name}/preprocess/data/train_val_test_${paths.preprocess.crop_suffix}
+datasets:
+  - train
+  - val
+  - test
+
+dataset_subdirs:
+  - images
+  - masks
 
 inference:
-  train_dir: ${hydra:runtime.cwd}/projects/${project.name}/train/version_${inference.version}
-  checkpoints: ${paths.inference.train_dir}/checkpoints
+  checkpoints: ${paths.project_train_dir}/version_${inference.version}/checkpoints
+
 # model output directory
-model_dir: ${paths.root_dir}/models/${project.name}_${paths.preprocess.crop_suffix}/${model.arch}_${model.encoder}
+model_dir: ${paths.root_dir}/models/${project.name}_${paths.crop_suffix}/${model.arch}_${model.encoder}
+
+# DB
+db:
+  # path to db directory
+  db_dir: ${paths.data_dir}/db
+
+  # path to db file
+  db_file: ${paths.db.db_dir}/agir.db

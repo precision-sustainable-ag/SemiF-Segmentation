@@ -1,29 +1,24 @@
 defaults:
   - paths: default           # Default paths config
-  # Training configs
-  - dataset: combined_veg       # Default dataset config
-  - augment: basic  # Default augmentations config
-  - train: default         # Train config
-  - model: deeplabv3plus         # Model config
-  - inference: default      # Inference config
+  - queries: default           # Default queries config
   - preprocess: default          # Default training config
+  - augment: default  # Default augmentations config
+  - model: deeplabv3plus         # Model config
+  - train: default         # Train config
+  - inference: default      # Inference config
+  
   - _self_                   # Ensures overriding behavior
 
 project:
-  name: "SEMIF"
-  subname: ${dataset.data_name}
-  output_dir: ${hydra:runtime.cwd}/projects/${project.name}/${mode}
+  name: LARGE_Hairy_Vetch
 
-logger:
-  save_dir: ${project.output_dir}
-  name: ${project.subname}
+mode: ??? # required argument for command line. Either preprocess, train, or inference
 
 job_now_date: &nowdir ${now:%Y-%m-%d}
 job_now_time: &nowtime ${now:%H:%M:%S}
 
-mode: ??? # required argument for command line. Either preprocess, train, or inference
 
 hydra:
   run:
-    dir: ${project.output_dir}/hydra/${job_now_date}_${job_now_time}  # Dynamically set the directory based on task
+    dir: ${paths.project_mode_dir}/hydra/${job_now_date}_${job_now_time}  # Dynamically set the directory based on task
   # output_subdir: "default"

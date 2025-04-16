@@ -134,8 +134,8 @@ def main(cfg: DictConfig):
     
     # Initialize dataset and dataloader
     test_dataset = SegmentationDataset(
-        images_dir=cfg.paths.split_data.test_image_dir,
-        masks_dir=cfg.paths.split_data.test_remapped_mask_dir,
+        images_dir=cfg.paths.test_image_dir,
+        masks_dir=cfg.paths.test_remapped_mask_dir,
         classes=cfg.train.classes,
         # augmentation=get_validation_augmentation(),
     )

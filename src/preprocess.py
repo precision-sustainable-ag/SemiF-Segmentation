@@ -11,21 +11,27 @@ from src.preprocessing.grid_crop import main as grid_crop
 from src.preprocessing.train_val_test_split import main as train_val_test_split
 from src.preprocessing.remap_masks import main as remap_masks
 from src.preprocessing.data_stats import main as data_stats
+from src.preprocessing.move_fullsized_data import main as move_fullsized_data
+from src.preprocessing.find_images import main as find_images
+from src.preprocessing.remove_nontargets import main as remove_nontargets
 
 log = logging.getLogger(__name__)
 
 # Define a registry of tasks
 TASK_REGISTRY = {
+    "find_images": find_images,
     "grid_crop": grid_crop,
     "train_val_test_split": train_val_test_split,
     "remap_masks": remap_masks,
     "data_stats": data_stats,
+    "move_fullsized_data": move_fullsized_data,
+    "remove_nontargets": remove_nontargets
     # Add more tasks here as needed
 }
 
 def copy_hydra_config_to_subfolder(cfg : DictConfig, task_name: str):
     """Copies the entire .hydra directory (or just specific config files) to a target directory."""
-    target_dir = Path(cfg.project.output_dir) / "data" / ".hydra" / task_name
+    target_dir = Path(cfg.paths.project_mode_dir) / "data" / ".hydra" / task_name
     source_hydra_dir = Path(HydraConfig.get().run.dir) / ".hydra"
     target_hydra_dir = target_dir 
     

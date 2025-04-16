@@ -3,6 +3,7 @@ import hydra
 from pathlib import Path
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
+import json
 import torch
 from torch.utils.data import DataLoader
 from pytorch_lightning import Trainer
@@ -20,6 +21,14 @@ def set_seed(seed=2**3):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
 
+def load_stats(stats_file: Path):
+        # stats_file = self.project_dir / "preprocess/data/data_stats/rgb_mean_std.json"
+    if stats_file.exists():
+        with open(stats_file) as f:
+            data = json.load(f)
+            return np.array(data['mean']), np.array(data['std'])
+    return None, None
+
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))  # Print full config for debugging
@@ -28,17 +37,18 @@ def main(cfg: DictConfig):
     devices_str = ",".join(map(str, nodes))    
     os.environ['CUDA_VISIBLE_DEVICES'] = devices_str
     
-    set_seed(cfg.dataset.data_seed)
-    
+    set_seed(cfg.train.seed)
+    stats_file = Path(cfg.paths.project_preprocess_dir) / "data/data_stats/rgb_mean_std.json"
+    mean, std = load_stats(stats_file)
     # Logger
-    logger = CSVLogger(save_dir=cfg.logger.save_dir, name=None)
+    logger = CSVLogger(save_dir=cfg.paths.project_mode_dir, name=None)
 
     # Directories
-    split_data_dir = Path(cfg.paths.train.split_data.split_dir)
+    split_data_dir = Path(cfg.paths.split_dir)
     train_image_dir = split_data_dir / "train" / "images"
-    train_mask_dir = split_data_dir / "train" / "remapped_masks"
+    train_mask_dir = split_data_dir / "train" / "masks"
     val_image_dir = split_data_dir / "val" / "images"
-    val_mask_dir = split_data_dir / "val" / "remapped_masks"
+    val_mask_dir = split_data_dir / "val" / "masks"
 
     checkpoint_dir = Path(logger.log_dir, "checkpoints")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -61,24 +71,40 @@ def main(cfg: DictConfig):
         train_image_dir,
         train_mask_dir,
         augmentation=train_aug(cfg),
-        normalize_image=cfg.dataset.normalize,
-        mean=np.array(cfg.dataset.mean),
-        std=np.array(cfg.dataset.std),
+        normalize_image=cfg.train.dataset.normalize,
+        mean=mean,
+        std=std,
     )
 
     val_dataset = Dataset(
         val_image_dir,
         val_mask_dir,
         augmentation=val_aug(cfg),
-        normalize_image=cfg.dataset.normalize,
-        mean=np.array(cfg.dataset.mean),
-        std=np.array(cfg.dataset.std),
+        normalize_image=cfg.train.dataset.normalize,
+        mean=mean,
+        std=std,
     )
     
-    train_loader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=True, num_workers=cfg.dataset.num_workers)
-    val_loader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=False, num_workers=cfg.dataset.num_workers)
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=cfg.train.batch_size, 
+        shuffle=True, 
+        num_workers=cfg.train.workers
+        )
     
-    sample_dataloader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=True, num_workers=cfg.dataset.num_workers)
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=cfg.train.batch_size, 
+        shuffle=False, 
+        num_workers=cfg.train.workers
+        )
+    
+    sample_dataloader = DataLoader(
+        train_dataset, 
+        batch_size=cfg.train.batch_size, 
+        shuffle=True, 
+        num_workers=cfg.train.workers
+        )
     viz_batch(sample_dataloader, output_dir=logger.log_dir)
     
     del sample_dataloader
@@ -97,7 +123,7 @@ def main(cfg: DictConfig):
     if cfg.train.train_strategy == "auto":
         train_strategy = "auto"
     elif cfg.train.train_strategy == "ddp":
-        train_strategy = DDPStrategy(find_unused_parameters=True)
+        train_strategy = DDPStrategy(find_unused_parameters=False)
     
     # Trainer
     trainer = Trainer(

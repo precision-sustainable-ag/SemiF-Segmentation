@@ -11,16 +11,26 @@ def train_aug(cfg):
     if cfg.augment.train.horizontal_flip:
         train_transform.append(A.HorizontalFlip(p=0.5))
     
-    if cfg.augment.train.shift_scale_rotate.enable:
-        sc_cfg = cfg.augment.train.shift_scale_rotate
+    if cfg.augment.train.affine.enable:
+        a_cfg = cfg.augment.train.affine
         train_transform.append(
-            A.ShiftScaleRotate(
-                scale_limit=sc_cfg.scale_limit,
-                rotate_limit=sc_cfg.rotate_limit,
-                shift_limit=sc_cfg.shift_limit,
-                border_mode=sc_cfg.border_mode,
-                p=sc_cfg.p,
-            )
+            A.Affine(
+                scale=a_cfg.scale, 
+                translate_percent=a_cfg.translate_percent, 
+                translate_px=a_cfg.translate_px, 
+                rotate=a_cfg.rotate, 
+                shear=a_cfg.shear, 
+                interpolation=a_cfg.interpolation, 
+                mask_interpolation=a_cfg.mask_interpolation, 
+                fit_output=a_cfg.fit_output, 
+                keep_ratio=a_cfg.keep_ratio, 
+                rotate_method=a_cfg.rotate_method, 
+                balanced_scale=a_cfg.balanced_scale, 
+                border_mode=a_cfg.border_mode, 
+                fill=a_cfg.fill, 
+                fill_mask=a_cfg.fill_mask,
+                p=a_cfg.p
+                )
         )
 
     if cfg.augment.train.padding.enable:
@@ -104,7 +114,7 @@ def train_aug(cfg):
             elif aug == "ElasticTransform":
                 noise_augs.append(A.ElasticTransform(alpha=vals["alpha"], sigma=vals["sigma"], alpha_affine=vals["alpha_affine"], p=vals["p"]))
             elif aug == "GaussNoise":
-                noise_augs.append(A.GaussNoise(var_limit=(vals["var_limit_min"], vals["var_limit_max"]), p=vals["p"]))
+                noise_augs.append(A.GaussNoise(mean_range=(vals["mean_range_min"], vals["mean_range_max"]), per_channel=vals['per_channel'], p=vals["p"], noise_scale_factor=vals["noise_scale_factor"]))
             elif aug == "ISONoise":
                 noise_augs.append(A.ISONoise(color_shift=(vals["color_shift_min"], vals["color_shift_max"]), intensity=(vals["intensity_min"], vals["intensity_max"]), p=vals["p"]))
         train_transform.append(A.OneOf(noise_augs, p=cfg.augment.train.noise_transforms.one_of_p))
