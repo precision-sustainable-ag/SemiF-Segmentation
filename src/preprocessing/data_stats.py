@@ -163,12 +163,13 @@ def plot_class_distributions(class_frequencies, title, group_name, output_dir=No
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     log.info("Starting data statistics calculation...")
-    split_dir = Path(cfg.paths.preprocess.split_data.split_dir)
+    data_stats_dir = Path(cfg.paths.project_mode_dir) / "data" / "data_stats"
+    split_dir = Path(cfg.paths.split_dir)
     train_image_dir = split_dir / "train" / "images"
-    train_remapped_mask_dir = split_dir / "train" / "remapped_masks"
-    val_remapped_mask_dir = split_dir / "val" / "remapped_masks"
-    test_remapped_mask_dir = split_dir / "test" / "remapped_masks"
-    output_dir = Path(cfg.project.output_dir) / "data" / "data_stats"
+    train_remapped_mask_dir = split_dir / "train" / "masks"
+    val_remapped_mask_dir = split_dir / "val" / "masks"
+    test_remapped_mask_dir = split_dir / "test" / "masks"
+    output_dir = Path(cfg.paths.project_mode_dir) / "data" / "data_stats"
     output_dir.mkdir(parents=True, exist_ok=True)
     group_name = cfg.preprocess.remap_masks.group_name
 
@@ -179,7 +180,7 @@ def main(cfg: DictConfig):
     mean, std = calculate_rgb_mean_std_shared(train_image_files, num_workers=18)
     log.info(f"Calculated Mean: {mean}, Std: {std}")
     # Save results
-    output_file = split_dir / "rgb_mean_std.json"
+    output_file = data_stats_dir / "rgb_mean_std.json"
     save_mean_std(mean, std, output_file)
 
     # Process masks

@@ -44,7 +44,7 @@ class FileHelper:
 class DataSet:
     """Class to manage and process a dataset of images and masks."""
 
-    def __init__(self, split_dir_cfg, val_size=0.1, test_size=0.1, random_state=42, use_concurrency=True):
+    def __init__(self, cfg:DictConfig):
         """
         Initialize the dataset handler.
         Args:
@@ -54,14 +54,15 @@ class DataSet:
             random_state (int): Random seed for splitting data.
             use_concurrency (bool): Whether to use concurrent file operations.
         """
-        self.split_dir_cfg = split_dir_cfg
-        self.test_size = test_size
-        self.val_size = val_size
-        self.random_state = random_state
-        self.use_concurrency = use_concurrency
+        self.split_dir_cfg=cfg.paths
+        self.val_size=cfg.preprocess.train_val_test_split.val_size
+        self.test_size=cfg.preprocess.train_val_test_split.test_size
+        self.random_state=cfg.preprocess.train_val_test_split.seed
+        self.use_concurrency=cfg.preprocess.train_val_test_split.use_concurrency
 
-    def gather_files(self, image_dir: Path, mask_dir: Path, model_testing: Dict):
-        """Gather image and mask files from the given directories."""
+
+    def get_files(self, image_dir: Path, mask_dir: Path, model_testing: Dict):
+        """Get image and mask files from the given directories."""
         log.info("Gathering images and masks.")
 
         self.image_list = sorted(image_dir.glob("*.jpg"))
@@ -150,33 +151,31 @@ class DataSet:
             else:
                 log.info(f"Copying {key} files sequentially.")
                 FileHelper.move_sequentially(pair_list, f"Copying {key} files")
-
-        log.info("Removing cropped image and mask directories.")
         
-    def remove_cropped_dirs(self, image_dir, mask_dir):
-        shutil.rmtree(image_dir)
-        shutil.rmtree(mask_dir)
-        log.info("Removed cropped image and mask directories.")
+    def remove_cropped_dirs(self, data_dir):
+        shutil.rmtree(data_dir)
+        log.info(f"Removed {data_dir.name} directory.")
 
 @hydra.main(version_base="1.3", config_path="configs", config_name="dataset_config")
 def main(cfg: DictConfig):
     log.info("Starting dataset split.")
     
-    dataset = DataSet(
-        split_dir_cfg=cfg.paths.preprocess.split_data,
-        val_size=cfg.preprocess.train_val_test_split.val_size,
-        test_size=cfg.preprocess.train_val_test_split.test_size,
-        random_state=cfg.preprocess.train_val_test_split.seed,
-        use_concurrency=cfg.preprocess.train_val_test_split.use_concurrency,
-    )
+    dataset = DataSet(cfg)
     
     log.info("Gathering files.")
     
-    image_dir = Path(cfg.paths.preprocess.cropped_image_dir)
-    mask_dir = Path(cfg.paths.preprocess.cropped_mask_dir)
+    image_dir = Path(cfg.paths.cropped_image_dir)
+    
+    if Path(cfg.paths.cropped_mask_dir+ "_remapped").exists():
+        mask_dir = Path(cfg.paths.cropped_mask_dir+ "_remapped")
+    else:
+        mask_dir = Path(cfg.paths.cropped_mask_dir)
+
+    log.info(f"Using image directory: {image_dir}")
+    log.info(f"Using mask directory: {mask_dir}")
     model_testing = cfg.preprocess.train_val_test_split.model_testing
     
-    dataset.gather_files(image_dir, mask_dir, model_testing)
+    dataset.get_files(image_dir, mask_dir, model_testing)
     
     log.info("Splitting data.")
     dataset.split_data()
@@ -186,7 +185,9 @@ def main(cfg: DictConfig):
 
     if cfg.preprocess.train_val_test_split.remove_cropped_data:
         log.info("Removing cropped image and mask directories.")
-        dataset.remove_cropped_dirs(image_dir, mask_dir)
+        dataset.remove_cropped_dirs(image_dir)
+        dataset.remove_cropped_dirs(mask_dir)
+        dataset.remove_cropped_dirs(Path(cfg.paths.cropped_mask_dir))
     
     log.info("Dataset split complete.")
 
