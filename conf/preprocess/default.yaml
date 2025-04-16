@@ -2,25 +2,31 @@ mode: preprocess
 
 tasks:
   move_fullsized_data: false
+  find_images: false
   remove_nontargets: false
   grid_crop: false # successfully tested
-  train_val_test_split: true # successfully tested
-  remap_masks: true # successfully tested
-  data_stats: false # successfully tested
+  remap_masks: false # successfully tested
+  train_val_test_split: false # successfully tested
+  
+  data_stats: true # successfully tested
   viz_results: false
 
-data_dir: ${paths.root_dir}/data/SYNTHETIC_HV_CC
+data_dir: ${paths.root_dir}/data/HAIRY_VETCH
 
 move_fullsized_data:
-  query_result: data/balanced_dataset.json
+  query_result: data/balanced_group_dataset.json
   remove_unmatched: True # remove images that do not have masks and vice-versa
 
 remove_nontargets:
   remove_colorchecker: True
 
 grid_crop:
-  crop_height: 512
-  crop_width: 512
+  crop_height: 1024
+  crop_width: 1024
+
+remap_masks:
+  group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
+  process_concurrently: False
 
 train_val_test_split:
   train_size:  # not used, train_size is calculated from val_size and test_size
@@ -34,9 +40,7 @@ train_val_test_split:
     status: false
     factor: 0.01
 
-remap_masks:
-  group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
-  process_concurrently: True
+
 
 data_stats:
   ignore_background: False # True ignores the background class for plotting

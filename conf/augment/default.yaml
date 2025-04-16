@@ -1,71 +1,85 @@
-# explore transformations at https://explore.albumentations.ai/
 train:
   img_hw: [1024, 1024]
   
   horizontal_flip: 
     enable: true
-    p: 0.5
+    p: 0.1  # Low probability
 
   vertical_flip: 
-    enable: true
-    p: 0.5
+    enable: false
+    p: 0.0
 
-# https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.OpticalDistortion
-  optical_distortion: 
-    enable: true
-    distort_limit: (-0.05,0.05)
-    p: 0.15
-  
-  shift_scale_rotate:
-    enable: true
-    scale_limit: 0.5
-    rotate_limit: 0
-    shift_limit: 0.1
+  affine: 
+    enable: false
+    scale: 0.0
+    translate_percent: 0.0
+    translate_px: 
+    rotate: [0, 0]
+    shear: 0
+    interpolation: 0 
+    mask_interpolation: 0 
+    fit_output: True
+    keep_ratio: True
+    rotate_method: largest_box
+    balanced_scale: True
     border_mode: 0
-    p: 1.0
-  
-  padding: true
-  
+    fill: 0.0
+    fill_mask: 0.0
+    p: 0.0
+
+  optical_distortion: 
+    enable: false
+    distort_limit: [0.0, 0.0]
+    p: 0.0
+
+  padding: 
+    enable: false
+    p: 0.0
+
   random_crop: 
-    enable: true
-    p: 0.25
-  
+    enable: false
+    p: 0.0
+
   gauss_noise: 
-    enable: true
-    noise_scale_factor: .2 # Scaling factor for noise generation. Value should be in the range (0, 1]. Smaller is faster.
-    p: 0.15 
-  
-  # https://albumentations.ai/docs/api_reference/augmentations/geometric/transforms/#albumentations.augmentations.geometric.transforms.Perspective
+    enable: false
+    noise_scale_factor: 0.0
+    p: 0.0 
+
   perspective: 
-    enable: true
-    scale: (0.05, 0.1)
+    enable: false
+    scale: [0.0, 0.0]
+    p: 0.0
 
   color_transforms:
     enable: true
     transforms:
-      - CLAHE
-      - RandomBrightnessContrast
-      - RandomGamma
-    p: 0.2
-  
+      - RandomGamma  # Light, deterministic effect
+    p: 0.05  # Very low
+
   blur_transforms:
-    enable: true
-    transforms:
-      - Sharpen # https://albumentations.ai/docs/api_reference/augmentations/transforms/?h=sharpen#albumentations.augmentations.transforms.Sharpen
-      - Blur
-      - MotionBlur # https://albumentations.ai/docs/api_reference/full_reference/?h=motion+blur#albumentations.augmentations.blur.transforms.MotionBlur
-    blur_limit: 3
-    p: 0.2
-  
+    enable: false
+    transforms: []
+    blur_limit: 0
+    p: 0.0
+
   hue_saturation:
     enable: true
     transforms:
       - RandomBrightnessContrast
-      - HueSaturationValue
-    p: 0.9
+    brightness_limit: [-0.1, 0.1]
+    contrast_limit: [-0.1, 0.1]  
+    hue_shift_limit: [0, 0]
+    sat_shift_limit: [0, 0]
+    val_shift_limit: [0, 0]
+    p: 0.05
+
+  noise_transforms:
+    enable: false
+    one_of_p: 0.0
+    transforms: {}
 
 val:
   img_hw: ${augment.train.img_hw}
   padding:
-    enable: true
-    p: 0.25
+    enable: false
+    p: 0.0

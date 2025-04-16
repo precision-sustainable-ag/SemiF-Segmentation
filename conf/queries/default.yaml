@@ -1,0 +1,79 @@
+validated:
+
+category:
+  common_name:
+  # - barley
+  # - barnyardgrass
+  # - black oats
+  # - broadleaf signalgrass
+  # - cereal rye
+  # - cocklebur
+  # - colorchecker
+  # - common lambsquarters
+  # - common ragweed
+  # - common sunflower
+  # - crimson clover
+  # - cultivated radish
+  # - fall panicum
+  # - giant foxtail
+  # - goosegrass
+  - hairy vetch
+  # - horseweed
+  # - italian ryegrass
+  # - jimson weed
+  # - johnsongrass
+  # - jungle rice
+  # - kochia
+  # - large crabgrass
+  # - maize
+  # - mustards
+  # - oats
+  # - palmer amaranth
+  # - pitted morning-glory
+  # - prickly sida
+  # - purple nutsedge
+  # - ragweed parthenium
+  # - red clover
+  # - sicklepod
+  # - smooth pigweed
+  # - soybean
+  # - spiny amaranth
+  # - sprawling signalgrass
+  # - texas millet
+  # - triticale
+  # - unknown
+  # - upland cotton
+  # - velvetleaf
+  # - waterhemp
+  # - winter pea
+  # - winter wheat
+  # - yellow foxtail
+
+morphological:
+  bbox_area_cm2:
+    default:
+      min: 100
+      max: 10000
+    # common_name_ranges:
+    #   vetch:
+    #     min: 15
+    #     max: 800
+    #   rye:
+    #     min: 20
+    #     max: 900
+
+  extends_border:
+  is_primary:
+
+  blur_effect:
+    min:
+    max:
+
+  num_components:
+    min:
+    max:
+
+  non_target_weed:
+  non_target_weed_pred_conf:
+    min:
+    max:
