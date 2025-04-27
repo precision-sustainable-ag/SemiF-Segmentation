@@ -89,21 +89,21 @@ def main(cfg: DictConfig):
         train_dataset, 
         batch_size=cfg.train.batch_size, 
         shuffle=True, 
-        num_workers=cfg.train.workers
+        num_workers=cfg.train.dataset.workers
         )
     
     val_loader = DataLoader(
         val_dataset, 
         batch_size=cfg.train.batch_size, 
         shuffle=False, 
-        num_workers=cfg.train.workers
+        num_workers=cfg.train.dataset.workers
         )
     
     sample_dataloader = DataLoader(
         train_dataset, 
         batch_size=cfg.train.batch_size, 
         shuffle=True, 
-        num_workers=cfg.train.workers
+        num_workers=cfg.train.dataset.workers
         )
     viz_batch(sample_dataloader, output_dir=logger.log_dir)
     
