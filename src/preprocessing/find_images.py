@@ -9,7 +9,6 @@ log = logging.getLogger(__name__)
 
 class DatasetManager:
     def __init__(self, cfg: DictConfig):
-        # self.query_result = Path(cfg.preprocess.move_fullsized_data.query_result)
         self.query_result = Path(cfg.paths.project_mode_dir).parent / "query" / f"{cfg.project.name}.json"
         self.primary_storage = Path(cfg.paths.primary_storage, "semifield-developed-images")
         self.secondary_storage = Path(cfg.paths.secondary_storage, "semifield-developed-images")
@@ -18,7 +17,6 @@ class DatasetManager:
         # self.destination_dir = Path(cfg.paths.data_dir, cfg.project.name)
         self.destination_dir = Path(cfg.paths.project_mode_dir) / "data"
         self.destination_dir.mkdir(parents=True, exist_ok=True)
-        self.remove_unmatched = cfg.preprocess.move_fullsized_data.remove_unmatched
         self.data = self.load_data()
         self.images = []
         self.masks = []
