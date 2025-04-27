@@ -1,21 +1,16 @@
 mode: preprocess
 
 tasks:
-  move_fullsized_data: false
-  find_images: false
-  remove_nontargets: false
-  grid_crop: false # successfully tested
-  remap_masks: false # successfully tested
-  train_val_test_split: false # successfully tested
+  find_images: true
+  remove_nontargets: true
+  grid_crop: true # successfully tested
+  remap_masks: true # successfully tested
+  train_val_test_split: true # successfully tested
   
   data_stats: true # successfully tested
   viz_results: false
 
 data_dir: ${paths.root_dir}/data/HAIRY_VETCH
-
-move_fullsized_data:
-  query_result: data/balanced_group_dataset.json
-  remove_unmatched: True # remove images that do not have masks and vice-versa
 
 remove_nontargets:
   remove_colorchecker: True
@@ -39,8 +34,6 @@ train_val_test_split:
   model_testing: # quick and dirty way to generate a small dataset, not recommended for final results
     status: false
     factor: 0.01
-
-
 
 data_stats:
   ignore_background: False # True ignores the background class for plotting

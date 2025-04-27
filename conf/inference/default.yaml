@@ -1,8 +1,7 @@
-subname: Field_test
-# input_dir: data/HAIRY_VETCH_lts/images
-input_dir: /home/mkutuga/Field-AnnotationPipeline/data/temp/TX_2023-10-06/developed-images/
+inference_subname: test_set
+input_dir: projects/some/inference/directory
 
-version: 1
+version: 4
 
 rescale_factor: 1.0
 threshold: 0.5
