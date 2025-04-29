@@ -90,7 +90,8 @@ def main(cfg: DictConfig):
         batch_size=cfg.train.batch_size, 
         shuffle=True, 
         num_workers=cfg.train.dataset.workers,
-        pin_memory=True
+        pin_memory=True,
+        drop_last=True
         )
     
     val_loader = DataLoader(
