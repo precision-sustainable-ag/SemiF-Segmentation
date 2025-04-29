@@ -4,6 +4,12 @@ batch_size: 8
 seed: 42
 augment: default
 
+loss:
+  name: DiceFocalLoss # DiceFocalLoss, DiceBCELoss, DiceWithBoundaryLoss
+
+lr:
+  base_lr: 0.001
+
 train_strategy: ddp # auto or ddp
 
 cuda_visible_devices: [5,6]
