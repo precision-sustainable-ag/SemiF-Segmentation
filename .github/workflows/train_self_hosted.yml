@@ -14,8 +14,7 @@ jobs:
 
       - name: Set up Conda environment
         run: |
-          source ~/.bashrc
-          conda init
+          source ~/miniconda3/etc/profile.d/conda.sh
           conda activate torch
 
       - name: Extract project.name from config
