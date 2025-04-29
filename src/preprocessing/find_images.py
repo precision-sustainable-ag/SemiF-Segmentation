@@ -64,6 +64,8 @@ class DatasetManager:
     def write_data_2_text_file(self, data: List[Path], file_path: Path):
         """Write the list of paths to a text file."""
         # Remove duplicates
+        # Sort the list of image paths by the stem of the path
+        data = sorted(data, key=lambda x: x.stem)
         data = list(set(data))
         with file_path.open('w') as f:
             for item in data:
