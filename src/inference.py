@@ -165,14 +165,8 @@ class InferenceRunner:
 
     def run(self):
         model = SegmentationModule.load_from_checkpoint(
-            arch_name=self.cfg.model.arch_name,
-            encoder_name=self.cfg.model.encoder_name,
-            encoder_weights=self.cfg.model.encoder_weights,
-            in_channels=self.cfg.model.in_channels,
-            out_classes=self.cfg.model.out_classes,
-            mode=self.cfg.model.mode,
-            ignore_index=self.cfg.model.ignore_index,
             checkpoint_path=self.model_ckpt,
+            cfg=self.cfg,
         ).to(self.device)
 
         processor = ImageProcessor(self.mean, self.std, self.cfg.inference.rescale_factor, self.cfg.inference.use_normalization)

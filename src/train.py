@@ -89,7 +89,8 @@ def main(cfg: DictConfig):
         train_dataset, 
         batch_size=cfg.train.batch_size, 
         shuffle=True, 
-        num_workers=cfg.train.dataset.workers
+        num_workers=cfg.train.dataset.workers,
+        pin_memory=True
         )
     
     val_loader = DataLoader(
@@ -110,15 +111,7 @@ def main(cfg: DictConfig):
     del sample_dataloader
 
     # Model
-    model = SegmentationModule(
-        arch_name=cfg.model.arch_name,
-        encoder_name=cfg.model.encoder_name,
-        encoder_weights=cfg.model.encoder_weights,
-        in_channels=cfg.model.in_channels,
-        out_classes=cfg.model.out_classes,
-        mode=cfg.model.mode,
-        ignore_index=cfg.model.ignore_index,
-    )
+    model = SegmentationModule(cfg)
     
     if cfg.train.train_strategy == "auto":
         train_strategy = "auto"
@@ -145,13 +138,7 @@ def main(cfg: DictConfig):
     # Load and Save best full model
     best_model_ckpt_path = best_checkpoint.best_model_path
     best_model = SegmentationModule.load_from_checkpoint(
-        arch_name=cfg.model.arch_name,
-        encoder_name=cfg.model.encoder_name,
-        encoder_weights=cfg.model.encoder_weights,
-        in_channels=cfg.model.in_channels,
-        out_classes=cfg.model.out_classes,
-        mode=cfg.model.mode,
-        ignore_index=cfg.model.ignore_index,
+        cfg=cfg,
         checkpoint_path=best_model_ckpt_path,
     )
     # Create a directory to save the model
