@@ -1,5 +1,3 @@
-mode: preprocess
-
 tasks:
   find_images: true
   remove_nontargets: true
