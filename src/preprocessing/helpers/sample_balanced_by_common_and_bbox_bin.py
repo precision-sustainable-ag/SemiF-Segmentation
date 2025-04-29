@@ -75,8 +75,10 @@ class CutoutSampler:
     def sample_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Sample the data grouped by common name and bounding box bin."""
         df = df.dropna(subset=["common_name", "bbox_bin"])
-        sampled_df = df.groupby(["common_name", "bbox_bin"]).apply(
-            lambda g: g.sample(min(len(g), self.samples_per_group), random_state=42)
+        sampled_df = df.groupby(["common_name", "bbox_bin"], group_keys=False).sample(
+            n=self.samples_per_group, 
+            random_state=42, 
+            replace=True  # or False depending if you want to allow duplicates when group is small
         ).reset_index(drop=True)
         log.info(f"Sampled dataframe shape: {sampled_df.shape}")
         return sampled_df
@@ -119,7 +121,7 @@ def main(cfg: DictConfig) -> None:
         db_path=Path(cfg.paths.db.db_file),
         output_dir=Path(cfg.paths.project_query_dir),
         samples_per_group=samples_per_group,
-        allowed_common_names=cfg.queries.category.common_name
+        allowed_common_names=cfg.query.category.common_name
     )
     sampler.run()
 

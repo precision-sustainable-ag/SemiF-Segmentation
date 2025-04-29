@@ -99,6 +99,7 @@ class DataSet:
             self.mask_list,
             test_size=self.test_size,
             random_state=self.random_state,
+            shuffle=True
             )
         
         # Calculate validation size relative to train+val size
@@ -110,6 +111,7 @@ class DataSet:
             train_val_mask_paths,
             test_size=relative_val_size,
             random_state=self.random_state,
+            shuffle=True
         )
 
         log.info(f"Training images: \t{len(self.train_img_paths)}")
