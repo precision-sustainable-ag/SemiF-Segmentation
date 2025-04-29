@@ -81,7 +81,7 @@ class Dataset(BaseDataset):
             self.images_fps = list(Path(images_dir).glob("*.jpg"))
             self.masks_fps = [Path(masks_dir, f"{img.stem}.png") for img in self.images_fps]
         else:
-            raise ValueError("images_dir and masks_dir must either be lists or valid directories.")
+            raise ValueError(f"images_dir and masks_dir must either be lists or valid directories not {images_dir} and {masks_dir}")
 
         self.augmentation = augmentation
         self.normalize_image = normalize_image
