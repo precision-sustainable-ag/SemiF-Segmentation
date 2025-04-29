@@ -85,8 +85,8 @@ class Dataset(BaseDataset):
 
         self.augmentation = augmentation
         self.normalize_image = normalize_image
-        self.mean = mean if mean is not None else np.array([0.0, 0.0, 0.0])
-        self.std = std if std is not None else np.array([1.0, 1.0, 1.0])
+        self.mean = np.array(mean) if mean is not None else np.array([0.0, 0.0, 0.0])
+        self.std = np.array(std) if std is not None else np.array([1.0, 1.0, 1.0])
 
     def __getitem__(self, idx):
         # Load image

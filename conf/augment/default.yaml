@@ -1,5 +1,5 @@
 train:
-  img_hw: [1024, 1024]
+  img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
   
   horizontal_flip: 
     enable: true

@@ -32,7 +32,7 @@ class SQLiteQueryHandler:
         self.conditions = []  # List to hold SQL conditions (strings).
         self.params = []      # List to hold values corresponding to the conditions.
         log.info("Connected to database: %s", self.db_path)
-        self.filter = cfg.queries
+        self.filter = cfg.query
 
     def add_conditions(self) -> None:
         """
