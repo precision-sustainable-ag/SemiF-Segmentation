@@ -68,8 +68,8 @@ def main(cfg: DictConfig):
     
     # Datasets and Dataloaders
     train_dataset = Dataset(
-        train_image_dir,
-        train_mask_dir,
+        train_image_dir.relative_to(Path.cwd()),
+        train_mask_dir.relative_to(Path.cwd()),
         augmentation=train_aug(cfg),
         normalize_image=cfg.train.dataset.normalize,
         mean=mean,
