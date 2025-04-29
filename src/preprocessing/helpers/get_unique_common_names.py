@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 
 log = logging.getLogger(__name__)
 
-@hydra.main(version_base="1.2", config_path="../../conf", config_name="config")
+@hydra.main(version_base="1.2", config_path="../../../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     db_path = cfg.paths.db.db_file
     table_name = "semif_cutouts"
@@ -28,8 +28,14 @@ def main(cfg: DictConfig) -> None:
         common_names = sorted(set(name[0] for name in results if name[0]))
 
         log.info(f"Found {len(common_names)} unique common names.")
-        for name in common_names:
-            print(name)
+        # Write the unique common names to a text file
+        output_query_dir = Path(cfg.paths.project_query_dir)
+        output_query_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_query_dir / "unique_common_names.txt"
+        with open(output_file, "w") as f:
+            for name in common_names:
+                f.write(f"{name}\n")
+        log.info(f"Unique common names written to {output_file}")
 
     except sqlite3.Error as e:
         log.error(f"Error querying database: {e}")
