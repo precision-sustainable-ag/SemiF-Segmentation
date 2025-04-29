@@ -10,8 +10,6 @@ tasks:
   data_stats: true # successfully tested
   viz_results: false
 
-data_dir: ${paths.root_dir}/data/HAIRY_VETCH
-
 remove_nontargets:
   remove_colorchecker: True
 
