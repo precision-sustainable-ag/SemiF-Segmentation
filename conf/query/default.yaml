@@ -1,6 +1,21 @@
+sample:
+    multi_domain_balanced:
+      enabled: true
+      domains: [category.common_name,bbox_bin]
+      samples_per_unique_domain: 10
+      replace: false # Allow or disallow sampling of the same row more than once.
+
+    random:
+      enabled: false
+      dataset_size: 1000
+      replace: false
+    
+    random_state: 42
+
 validated:
 
 category:
+  enabled: true
   common_name:
   # - barley
   # - barnyardgrass
@@ -17,7 +32,7 @@ category:
   # - fall panicum
   # - giant foxtail
   # - goosegrass
-  - hairy vetch
+  # - hairy vetch
   # - horseweed
   # - italian ryegrass
   # - jimson weed
@@ -34,7 +49,7 @@ category:
   # - purple nutsedge
   # - ragweed parthenium
   # - red clover
-  # - sicklepod
+  - sicklepod
   # - smooth pigweed
   # - soybean
   # - spiny amaranth
@@ -51,10 +66,11 @@ category:
 
 morphological:
   bbox_area_cm2:
+    enabled: true
     default:
-      min: 100
+      min: 0
       max: 10000
-    # common_name_ranges:
+    # common_name_ranges: Not implemented
     #   vetch:
     #     min: 15
     #     max: 800
@@ -62,18 +78,29 @@ morphological:
     #     min: 20
     #     max: 900
 
-  extends_border:
-  is_primary:
+  extends_border: # not tested
+    enabled: false
+    status: false
 
-  blur_effect:
+  is_primary: # not tested
+    enabled: false
+    status: false
+
+  blur_effect: # not tested
+    enabled: false
     min:
     max:
 
-  num_components:
+  num_components: # not tested
+    enabled: false
     min:
     max:
 
-  non_target_weed:
-  non_target_weed_pred_conf:
+  non_target_weed: # not tested
+    enabled: false
+    status: false
+
+  non_target_weed_pred_conf: # not implemented
+    enabled: false
     min:
     max:
