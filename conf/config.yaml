@@ -10,7 +10,7 @@ defaults:
   - _self_                   # Ensures overriding behavior
 
 project:
-  name: 
+  name: grasses_001
 
 mode: ??? # required argument for command line. Either preprocess, train, or inference
 

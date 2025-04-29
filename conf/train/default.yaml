@@ -1,6 +1,6 @@
 mode: train
-epochs: 100
-batch_size: 8
+epochs: 1
+batch_size: 16
 seed: 42
 augment: default
 
@@ -12,11 +12,11 @@ lr:
 
 train_strategy: ddp # auto or ddp
 
-cuda_visible_devices: [5,6]
+cuda_visible_devices: [5]
 
 dataset:
   normalize: true
-  workers: 12
+  workers: 16
 
 trainer:
   max_epochs: ${train.epochs}

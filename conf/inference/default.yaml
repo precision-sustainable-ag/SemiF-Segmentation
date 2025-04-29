@@ -1,9 +1,9 @@
 inference_subname: test_set
-input_dir: projects/some/inference/directory
+input_dir: ../Field-AnnotationPipeline/data/temp/TX_2023-10-06/cutouts/
 
-version: 4
+version: 0
 
-rescale_factor: 1.0
+rescale_factor: .5
 threshold: 0.5
 use_normalization: true
 

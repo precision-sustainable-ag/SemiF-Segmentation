@@ -1,0 +1,31 @@
+jobs:
+  run_pipeline:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Conda environment
+        run: |
+          source ~/.bashrc
+          conda activate torch
+
+      - name: Extract project.name from config
+        id: resolve_project
+        run: |
+          PROJECT_NAME=$(python scripts/extract_project_name.py)
+          echo "Detected project.name: $PROJECT_NAME"
+          echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
+
+      - name: Run full training pipeline
+        run: |
+          python main.py mode=train
+
+      - name: Create GitHub issue with training metrics
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PROJECT_NAME: ${{ env.PROJECT_NAME }}
+        run: |
+          python scripts/create_training_issue.py
