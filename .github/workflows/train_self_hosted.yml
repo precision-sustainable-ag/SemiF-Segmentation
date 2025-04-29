@@ -1,3 +1,9 @@
+name: Segmentation Pipeline (Self-Hosted)
+
+on:
+  push:
+    branches:
+      - develop
 jobs:
   run_pipeline:
     runs-on: self-hosted
