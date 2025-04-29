@@ -1,6 +1,7 @@
 # path to root directory
 # this relys on main.py to be run from the project root
-root_dir: ${hydra:runtime.cwd}
+# root_dir: ${hydra:runtime.cwd}
+root_dir: /home/mkutuga/SemiF-Segmentation
 
 project_dir: ${paths.root_dir}/projects/${project.name}
 project_mode_dir: ${paths.project_dir}/${mode}
