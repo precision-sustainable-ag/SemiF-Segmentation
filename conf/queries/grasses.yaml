@@ -1,0 +1,53 @@
+validated:
+
+category:
+  common_name:
+  - barley
+  - barnyardgrass
+  - black oats
+  - broadleaf signalgrass
+  - cereal rye
+  - fall panicum
+  - giant foxtail
+  - goosegrass
+  - italian ryegrass
+  - johnsongrass
+  - jungle rice
+  - large crabgrass
+  - maize
+  - oats
+  - purple nutsedge
+  - sprawling signalgrass
+  - texas millet
+  - triticale
+  - winter wheat
+  - yellow foxtail
+
+morphological:
+  bbox_area_cm2:
+    default:
+      min: 100
+      max: 10000
+    # common_name_ranges:
+    #   vetch:
+    #     min: 15
+    #     max: 800
+    #   rye:
+    #     min: 20
+    #     max: 900
+
+  extends_border:
+  is_primary:
+
+  blur_effect:
+    min:
+    max:
+
+  num_components:
+    min:
+    max:
+
+  non_target_weed:
+  non_target_weed_pred_conf:
+    min:
+    max:
