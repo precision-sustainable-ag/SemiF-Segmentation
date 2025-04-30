@@ -35,7 +35,7 @@ class DatasetManager:
         images, masks, metadata = [], [], []
         storage_paths = [self.primary_storage, self.secondary_storage, self.tertiary_storage]
 
-        for record in tqdm(self.data):
+        for record in tqdm(self.data, leave=False, desc="Collecting paths"):
             batch = record["batch_id"]
             image_id = record["image_id"]
 

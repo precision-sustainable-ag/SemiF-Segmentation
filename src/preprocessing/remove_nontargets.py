@@ -109,11 +109,10 @@ class NonTargetRemover:
 
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
-    log.info("Starting cropping of images and masks.")
-    log.info("Cropping images and masks")
+    log.info("Removing non_target weeds.")
     processor = NonTargetRemover(cfg)
     processor.process_all()
-    log.info("Cropping complete")
+    log.info("Non-target removal completed.")
 
 if __name__ == "__main__":
     main()
