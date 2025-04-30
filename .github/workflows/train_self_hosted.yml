@@ -18,17 +18,17 @@ jobs:
           conda activate torch
 
       - name: Sync data (only if config or batch list changes)
-        if: ${{ github.event.head_commit.message != 'TRAIN_ONLY' }}
+        if: ${{ !contains(github.event.head_commit.message, 'TRAIN_ONLY') }}
         run: |
           python main.py mode=sync
 
       - name: Query (only if query config changes)
-        if: ${{ github.event.head_commit.message != 'TRAIN_ONLY' }}
+        if: ${{ !contains(github.event.head_commit.message, 'TRAIN_ONLY') }}
         run: |
           python main.py mode=query
 
       - name: Preprocess (only if preprocessing config or augmentations change)
-        if: ${{ github.event.head_commit.message != 'TRAIN_ONLY' }}
+        if: ${{ !contains(github.event.head_commit.message, 'TRAIN_ONLY') }}
         run: |
           python main.py mode=preprocess
 

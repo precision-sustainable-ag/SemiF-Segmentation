@@ -16,8 +16,6 @@ def format_run_info(run_info_path: str) -> str:
 
     lines = ["| Key | Value |", "|------|-------|"]
     for k, v in info.items():
-        if k == "version_dir":
-            v = Path(v).relative_to(Path.cwd()).as_posix()
         lines.append(f"| {k} | {v} |")
     return "\n".join(lines)
 
