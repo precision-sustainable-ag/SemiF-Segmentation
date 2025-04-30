@@ -33,6 +33,13 @@ jobs:
           echo "PROJECT_NAME=$PROJECT_NAME"
           echo "VERSION_DIR=$VERSION_DIR" >> $GITHUB_ENV
           echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
+        
+      - name: Collect training plot as artifact
+        if: ${{ env.VERSION_DIR != '' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: training-plot
+          path: ${{ env.VERSION_DIR }}/metrics.png
 
 
       - name: Create GitHub issue with training metrics

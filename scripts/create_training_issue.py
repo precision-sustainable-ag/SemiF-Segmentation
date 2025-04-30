@@ -3,15 +3,10 @@ import pandas as pd
 import requests
 import json
 import base64
+from pathlib import Path
 from datetime import datetime
 
-def encode_image_base64(path: str) -> str:
-    if not os.path.exists(path):
-        return None
-    with open(path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
-        return f"![metrics.png](data:image/png;base64,{encoded_string})"
-    
+
 def format_run_info(run_info_path: str) -> str:
     if not os.path.exists(run_info_path):
         return "_run_info.json not found_"
@@ -21,6 +16,8 @@ def format_run_info(run_info_path: str) -> str:
 
     lines = ["| Key | Value |", "|------|-------|"]
     for k, v in info.items():
+        if k == "version_dir":
+            v = Path(v).relative_to(Path.cwd()).as_posix()
         lines.append(f"| {k} | {v} |")
     return "\n".join(lines)
 
@@ -89,8 +86,8 @@ def main():
     token = os.environ.get("GH_TOKEN")
     version_dir = os.environ.get("VERSION_DIR", "")
     project_name = os.environ.get("PROJECT_NAME", "unknown_project")
-    image_path = os.path.join(version_dir, "metrics.png")
-    image_md = encode_image_base64(image_path) or "_No plot found._"
+    run_url = os.environ.get("GITHUB_SERVER_URL") + "/" + os.environ.get("GITHUB_REPOSITORY") + "/actions/runs/" + os.environ.get("GITHUB_RUN_ID")
+    image_md = f"[📈 Download metrics plot from workflow run]({run_url})"
 
     run_info_file = "logs/run_info.json"
     run_info_md = format_run_info(run_info_file)
@@ -119,7 +116,7 @@ def main():
 
 ---
 
-#### 📈 Validation Metrics Plot
+#### 📈 Training Plots
 
 {image_md}
 
