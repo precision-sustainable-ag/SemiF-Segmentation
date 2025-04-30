@@ -36,7 +36,7 @@ jobs:
         
       - name: Collect training plot as artifact
         if: ${{ env.VERSION_DIR != '' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: training-plot
           path: ${{ env.VERSION_DIR }}/metrics.png
