@@ -1,6 +1,6 @@
 defaults:
   - paths: default           # Default paths config
-  - query: default           # Default query config
+  - query: grasses           # Default query config
   - preprocess: default          # Default training config
   - augment: default  # Default augmentations config
   - model: deeplabv3plus         # Model config
