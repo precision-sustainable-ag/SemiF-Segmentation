@@ -1,8 +1,9 @@
 # path to root directory
 # this relys on main.py to be run from the project root
 root_dir: ${hydra:runtime.cwd}
+persistent_dir: /home/mkutuga/SemiF-Segmentation 
 
-project_dir: ${paths.root_dir}/projects/${project.name}
+project_dir: ${paths.persistent_proj_dir}/projects/${project.name}
 project_mode_dir: ${paths.project_dir}/${mode}
 project_query_dir: ${paths.project_dir}/query
 project_preprocess_dir: ${paths.project_dir}/preprocess
@@ -10,7 +11,7 @@ project_train_dir: ${paths.project_dir}/train
 project_inference_dir: ${paths.project_dir}/inference
 
 # path to data directory
-data_dir: ${paths.root_dir}/data
+data_dir: ${paths.persistent_dir}/data
 
 
 # NCSU Storage lockers
