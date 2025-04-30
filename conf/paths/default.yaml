@@ -3,7 +3,7 @@
 root_dir: ${hydra:runtime.cwd}
 persistent_dir: /home/mkutuga/SemiF-Segmentation 
 
-project_dir: ${paths.persistent_proj_dir}/projects/${project.name}
+project_dir: ${paths.persistent_dir}/projects/${project.name}
 project_mode_dir: ${paths.project_dir}/${mode}
 project_query_dir: ${paths.project_dir}/query
 project_preprocess_dir: ${paths.project_dir}/preprocess
