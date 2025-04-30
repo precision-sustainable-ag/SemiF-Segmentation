@@ -17,17 +17,22 @@ jobs:
           source ~/miniconda3/etc/profile.d/conda.sh
           conda activate torch
 
-      - name: Extract project.name from config
-        id: resolve_project
-        run: |
-          PROJECT_NAME=$(python scripts/extract_project_name.py)
-          echo "Detected project.name: $PROJECT_NAME"
-          echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
-
       - name: Run full training pipeline
         run: |
           python main.py mode=sync
           python main.py mode=query
+          python main.py mode=preprocess
+          python main.py mode=train
+
+      - name: Read version directory and project from run_info.json
+        id: load_version
+        run: |
+          VERSION_DIR=$(jq -r .version_dir logs/run_info.json)
+          PROJECT_NAME=$(jq -r .project_name logs/run_info.json)
+          echo "VERSION_DIR=$VERSION_DIR"
+          echo "PROJECT_NAME=$PROJECT_NAME"
+          echo "VERSION_DIR=$VERSION_DIR" >> $GITHUB_ENV
+          echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
 
 
       - name: Create GitHub issue with training metrics
@@ -37,3 +42,9 @@ jobs:
           PROJECT_NAME: ${{ env.PROJECT_NAME }}
         run: |
           python scripts/create_training_issue.py
+
+      - name: Cleanup logs and artifacts
+        if: ${{ success() }}
+        run: |
+          echo "Cleaning up logs and artifacts..."
+          rm -rf logs/
