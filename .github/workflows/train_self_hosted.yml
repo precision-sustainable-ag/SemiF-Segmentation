@@ -60,6 +60,7 @@ jobs:
           fi
 
           # Copy image into new branch
+          mkdir -p artifacts_worktree/assets
           cp "$IMAGE_PATH" artifacts_worktree/assets/
 
           cd artifacts_worktree
