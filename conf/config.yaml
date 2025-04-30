@@ -12,7 +12,7 @@ defaults:
 project:
   name: grasses_004
 
-mode: ??? # required argument for command line. Either preprocess, train, or inference
+mode: ??? # required argument for command line. Either sync, preprocess, train, or inference
 
 job_now_date: &nowdir ${now:%Y-%m-%d}
 job_now_time: &nowtime ${now:%H:%M:%S}

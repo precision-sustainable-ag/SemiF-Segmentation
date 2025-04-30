@@ -51,7 +51,7 @@ def update_file(local_file: Path, remote_file: Path):
     except Exception as e:
         log.error(f"Failed to update {local_file}: {e}")
 
-@hydra.main(version_base="1.3", config_path="../../conf", config_name="config")
+@hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """
     Checks if local files are up to date compared to their remote versions,

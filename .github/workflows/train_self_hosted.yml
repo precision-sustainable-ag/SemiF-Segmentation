@@ -26,6 +26,7 @@ jobs:
 
       - name: Run full training pipeline
         run: |
+          python main.py mode=sync
           python main.py mode=query
 
 
