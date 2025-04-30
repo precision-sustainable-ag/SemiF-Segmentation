@@ -2,7 +2,7 @@ sample:
     multi_domain_balanced:
       enabled: true
       domains: [category.common_name,bbox_bin]
-      samples_per_unique_domain: 2
+      samples_per_unique_domain: 50
       replace: false # Allow or disallow sampling of the same row more than once.
 
     random:
@@ -17,6 +17,26 @@ validated:
 category:
   enabled: true
   common_name:
+    - barley
+    - barnyardgrass
+    - black oats
+    - broadleaf signalgrass
+    - cereal rye
+    - fall panicum
+    - giant foxtail
+    - goosegrass
+    - italian ryegrass
+    - johnsongrass
+    - jungle rice
+    - large crabgrass
+    - maize
+    - oats
+    - purple nutsedge
+    - sprawling signalgrass
+    - texas millet
+    - triticale
+    - winter wheat
+    - yellow foxtail
   # - barley
   # - barnyardgrass
   # - black oats
@@ -49,9 +69,9 @@ category:
   # - purple nutsedge
   # - ragweed parthenium
   # - red clover
-  - sicklepod
-  - smooth pigweed
-  - soybean
+  # - sicklepod
+  # - smooth pigweed
+  # - soybean
   # - spiny amaranth
   # - sprawling signalgrass
   # - texas millet

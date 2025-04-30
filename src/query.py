@@ -230,24 +230,29 @@ class CutoutQuerySampler:
 
         elif self.strategy == "balanced":
             grouped = df.groupby(list(self.domains), group_keys=False)
-            min_group_size = min(grouped.size())
-            sampled_df = grouped.sample(
-                n=min(min_group_size, self.samples_per_unique_domain),
-                random_state=self.random_state,
-                replace=self.replace
-            ).reset_index(drop=True)
+            sampled_groups = []
+
+            for name, group in grouped:
+                n = self.samples_per_unique_domain
+                if not self.replace:
+                    n = min(len(group), self.samples_per_unique_domain)
+
+                sampled = group.sample(n=n, random_state=self.random_state, replace=self.replace)
+                sampled_groups.append(sampled)
+
+            sampled_df = pd.concat(sampled_groups).reset_index(drop=True)
             log.info(f"Balanced sampled {len(sampled_df)} rows across domains {self.domains}.")
             return sampled_df
 
         else:
             raise ValueError(f"Unknown sampling strategy: {self.strategy}")
-
     def save_samples(self, df: pd.DataFrame):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.output_dir / f"{self.project_name}.json"
         df.to_json(output_path, orient="records", indent=4)
         
         un_nested_df = self.unnest_json_columns(df)
+        log.info(f"{un_nested_df['image_id'].nunique()} unique images in the dataset.")
         un_nested_df.to_csv(self.output_dir / f"{self.project_name}.csv", index=False)
         log.info(f"Saved samples to {output_path}")
 

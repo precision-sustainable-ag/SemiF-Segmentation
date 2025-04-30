@@ -1,4 +1,4 @@
-name: Cleanup Old Plots
+name: Cleanup Old Metrics Plots
 
 on:
   schedule:
@@ -7,17 +7,21 @@ on:
 jobs:
   clean:
     runs-on: self-hosted
+
     steps:
-      - name: Checkout
+      - name: Checkout training-artifacts branch
         uses: actions/checkout@v4
+        with:
+          ref: training-artifacts
 
-      - name: Remove old plots
+      - name: Remove metrics_*.png files older than 7 days
         run: |
-          find assets/ -name 'metrics_*.png' -mtime +7 -exec git rm {} \;
+          echo "🔍 Looking for old metrics plots..."
+          find assets/ -name 'metrics_*.png' -mtime +7 -print -exec git rm {} \;
 
-      - name: Commit deletions
+      - name: Commit and push deletions
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git commit -m "Cleanup old metrics plots"
-          git push origin develop
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "🧹 Cleanup old metrics plots" || echo "No plots to remove"
+          git push origin training-artifacts
