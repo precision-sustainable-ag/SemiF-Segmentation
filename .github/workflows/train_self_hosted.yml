@@ -49,6 +49,7 @@ jobs:
           # Check if remote branch exists
           if git ls-remote --exit-code origin training-artifacts; then
             echo "✅ Remote branch exists, using it"
+            git fetch origin training-artifacts:refs/remotes/origin/training-artifacts
             git worktree add artifacts_worktree origin/training-artifacts
           else
             echo "🚧 Remote branch does not exist, creating new orphan branch"
