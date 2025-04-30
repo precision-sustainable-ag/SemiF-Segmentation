@@ -2,8 +2,16 @@ import os
 import pandas as pd
 import requests
 import json
+import base64
 from datetime import datetime
 
+def encode_image_base64(path: str) -> str:
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+        return f"![metrics.png](data:image/png;base64,{encoded_string})"
+    
 def format_run_info(run_info_path: str) -> str:
     if not os.path.exists(run_info_path):
         return "_run_info.json not found_"
@@ -81,12 +89,14 @@ def main():
     token = os.environ.get("GH_TOKEN")
     version_dir = os.environ.get("VERSION_DIR", "")
     project_name = os.environ.get("PROJECT_NAME", "unknown_project")
+    image_path = os.path.join(version_dir, "metrics.png")
+    image_md = encode_image_base64(image_path) or "_No plot found._"
 
     run_info_file = "logs/run_info.json"
     run_info_md = format_run_info(run_info_file)
     
     metrics_file = os.path.join(version_dir, "metrics.csv")
-    dataset_iou, per_image_iou, markdown_table = extract_metrics(metrics_file)
+    _, _, markdown_table = extract_metrics(metrics_file)
     
 
     title = f"Training Report - {project_name} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
@@ -96,8 +106,6 @@ def main():
 **Project:** `{project_name}`  
 **Run Time:** `{datetime.now().isoformat()}`
 
-**Validation Dataset IoU:** `{dataset_iou}`  
-**Validation Per-Image IoU:** `{per_image_iou}`
 
 #### 📊 Last 10 Training Steps
 
@@ -108,6 +116,12 @@ def main():
 #### 📝 Run Info Summary
 
 {run_info_md}
+
+---
+
+#### 📈 Validation Metrics Plot
+
+{image_md}
 
 _Triggered by push to `develop` branch._
 """
