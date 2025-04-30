@@ -27,8 +27,7 @@ jobs:
       - name: Run full training pipeline
         run: |
           python main.py mode=query
-          python main.py mode=preprocess
-          python main.py mode=train
+
 
       - name: Create GitHub issue with training metrics
         env:
