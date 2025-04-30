@@ -34,7 +34,7 @@ jobs:
 
       - name: Train
         run: |
-          python main.py mode=train
+          taskset -c 2-31 python main.py mode=train
 
       - name: Read version directory and project from run_info.json
         id: load_version
