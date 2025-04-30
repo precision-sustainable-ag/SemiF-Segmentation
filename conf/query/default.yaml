@@ -2,7 +2,7 @@ sample:
     multi_domain_balanced:
       enabled: true
       domains: [category.common_name,bbox_bin]
-      samples_per_unique_domain: 10
+      samples_per_unique_domain: 2
       replace: false # Allow or disallow sampling of the same row more than once.
 
     random:
@@ -50,8 +50,8 @@ category:
   # - ragweed parthenium
   # - red clover
   - sicklepod
-  # - smooth pigweed
-  # - soybean
+  - smooth pigweed
+  - soybean
   # - spiny amaranth
   # - sprawling signalgrass
   # - texas millet
@@ -68,7 +68,7 @@ morphological:
   bbox_area_cm2:
     enabled: true
     default:
-      min: 0
+      min: 100
       max: 10000
     # common_name_ranges: Not implemented
     #   vetch:

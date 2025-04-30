@@ -1,6 +1,7 @@
 import os
 import hydra
 from pathlib import Path
+from datetime import datetime
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
 import json
@@ -28,6 +29,31 @@ def load_stats(stats_file: Path):
             data = json.load(f)
             return np.array(data['mean']), np.array(data['std'])
     return None, None
+
+def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
+    """
+    Log run information to the logger for github actions.
+    """
+    valid_per_image_iou = val_result[0]["valid_per_image_iou"]
+    valid_dataset_iou = val_result[0]["valid_dataset_iou"]
+    valid_background_iou = val_result[0]["valid_background_iou"]
+    valid_object_iou = val_result[0]["valid_object_iou"]
+    run_info = {
+        "version_dir": str(logger.log_dir),
+        "project_name": cfg.project.name,
+        "timestamp": datetime.now().isoformat(),
+        "valid_dataset_iou": valid_dataset_iou,
+        "valid_per_image_iou": valid_per_image_iou,
+        "valid_background_iou": valid_background_iou,
+        "valid_object_iou": valid_object_iou,
+        "num_epochs": cfg.train.epochs,
+        "batch_size": cfg.train.batch_size,
+        }
+
+    Path("logs").mkdir(exist_ok=True)
+    with open("logs/run_info.json", "w") as f:
+        json.dump(run_info, f, indent=4)
+    print(f"Run info saved to: logs/run_info.json")
 
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
@@ -135,6 +161,8 @@ def main(cfg: DictConfig):
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
     print(f"Validation IoU per images: {valid_per_image_iou}")
     print(f"Validation dataset IoU: {valid_dataset_iou}")
+    
+    log_run_info(logger, cfg, val_result)
 
     # Load and Save best full model
     best_model_ckpt_path = best_checkpoint.best_model_path
