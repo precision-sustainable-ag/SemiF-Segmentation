@@ -42,7 +42,7 @@ morphological:
   bbox_area_cm2:
     enabled: true
     default:
-      min: 100
+      min: 200
       max: 5000
     # common_name_ranges:
     #   vetch:
