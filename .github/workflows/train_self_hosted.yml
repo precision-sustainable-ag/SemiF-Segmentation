@@ -54,15 +54,21 @@ jobs:
           mkdir -p assets
           cp "$VERSION_DIR/metrics.png" "$IMAGE_PATH"
 
-          # Setup safe Git config
+          # Setup Git identity
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Check if remote branch exists
+          # 🧹 Remove stale worktree registration if it exists
+          if git worktree list | grep -q 'artifacts_worktree'; then
+            echo "🧹 Removing stale registered worktree"
+            git worktree remove --force artifacts_worktree || git worktree prune
+          fi
+
+          # Set up worktree
           if git ls-remote --exit-code origin training-artifacts; then
             echo "✅ Remote branch exists, using it"
             git fetch origin training-artifacts:refs/remotes/origin/training-artifacts
-            git worktree add -b training-artifacts artifacts_worktree origin/training-artifacts
+            git worktree add artifacts_worktree origin/training-artifacts
           else
             echo "🚧 Remote branch does not exist, creating new orphan branch"
             git worktree add -b training-artifacts artifacts_worktree
@@ -72,7 +78,7 @@ jobs:
             cd ..
           fi
 
-          # Copy image into new branch
+          # Copy image and commit
           mkdir -p artifacts_worktree/assets
           cp "$IMAGE_PATH" artifacts_worktree/assets/
 
@@ -80,8 +86,9 @@ jobs:
           git add "assets/$IMAGE_NAME"
           git commit -m "Add metrics plot for run $GITHUB_RUN_ID"
           git push origin HEAD:refs/heads/training-artifacts
-
           cd ..
+
+          # Clean up worktree
           git worktree remove artifacts_worktree
 
       - name: Create GitHub issue with training metrics
