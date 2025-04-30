@@ -34,13 +34,15 @@ jobs:
           echo "VERSION_DIR=$VERSION_DIR" >> $GITHUB_ENV
           echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
         
-      - name: Collect training plot as artifact
-        if: ${{ env.VERSION_DIR != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: training-plot
-          path: ${{ env.VERSION_DIR }}/metrics.png
-
+      - name: Copy and commit metrics plot to repo
+        run: |
+          mkdir -p assets
+          cp "$VERSION_DIR/metrics.png" "assets/metrics_${GITHUB_RUN_ID}.png"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/metrics_${GITHUB_RUN_ID}.png
+          git commit -m "Add metrics plot for run $GITHUB_RUN_ID"
+          git push origin develop
 
       - name: Create GitHub issue with training metrics
         env:

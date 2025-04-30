@@ -1,0 +1,23 @@
+name: Cleanup Old Plots
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # every Monday at 3AM UTC
+
+jobs:
+  clean:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove old plots
+        run: |
+          find assets/ -name 'metrics_*.png' -mtime +7 -exec git rm {} \;
+
+      - name: Commit deletions
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git commit -m "Cleanup old metrics plots"
+          git push origin develop

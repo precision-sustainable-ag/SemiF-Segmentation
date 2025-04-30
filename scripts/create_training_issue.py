@@ -83,11 +83,13 @@ def create_issue(repo, token, title, body):
 
 def main():
     repo = os.environ.get("GITHUB_REPOSITORY")
+    run_id = os.environ.get("GITHUB_RUN_ID")
     token = os.environ.get("GH_TOKEN")
     version_dir = os.environ.get("VERSION_DIR", "")
     project_name = os.environ.get("PROJECT_NAME", "unknown_project")
-    run_url = os.environ.get("GITHUB_SERVER_URL") + "/" + os.environ.get("GITHUB_REPOSITORY") + "/actions/runs/" + os.environ.get("GITHUB_RUN_ID")
-    image_md = f"[📈 Download metrics plot from workflow run]({run_url})"
+    
+    image_url = f"https://raw.githubusercontent.com/{repo}/develop/static_reports/metrics_{run_id}.png"
+    image_md = f"![Training Plots]({image_url})"
 
     run_info_file = "logs/run_info.json"
     run_info_md = format_run_info(run_info_file)
