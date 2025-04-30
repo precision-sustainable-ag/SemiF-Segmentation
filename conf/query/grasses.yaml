@@ -2,7 +2,7 @@ sample:
     multi_domain_balanced:
       enabled: true
       domains: [category.common_name,bbox_bin]
-      samples_per_unique_domain: 1
+      samples_per_unique_domain: 20
       replace: false # Allow or disallow sampling of the same row more than once.
 
     random:
