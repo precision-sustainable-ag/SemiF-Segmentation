@@ -62,6 +62,12 @@ class NonTargetRemover:
                     # if annotation["non_target_weed"] is not None:
                         # log.info(f'Non-target weed {annotation["non_target_weed"]} found in {mask_file}')
                     
+                    if not isinstance(annotation["non_target_weed"], bool):
+                        if "non_target" in annotation["non_target_weed"]:
+                            annotation["non_target_weed"] = True
+                        else:
+                            annotation["non_target_weed"] = False
+
                     if annotation["non_target_weed"] == True:
                         log.debug(f"Removing non-target weed from {mask_path}")
                         bbox_xywh = annotation["bbox_xywh"] # top left x, top left y, width, height in pixels
@@ -69,9 +75,6 @@ class NonTargetRemover:
                         x1, y1, w, h = bbox_xywh[0], bbox_xywh[1], bbox_xywh[2], bbox_xywh[3]
                         x2, y2 = x1 + w, y1 + h
                         mask[y1:y2, x1:x2] = np.where(mask[y1:y2, x1:x2] == category_class_id, 0, mask[y1:y2, x1:x2])
-                    
-                    if not isinstance(annotation["non_target_weed"], bool):
-                        log.warning(f"Non-target weed value is not a boolean in {mask_path.name}. Invalid value: {annotation['non_target_weed']}")
                     
                 if self.remove_colorchecker:
                     if annotation["category_class_id"] == 28:

@@ -42,7 +42,7 @@ class CropProcessor:
         # Check if local masks are present
         if any(mask_folder.glob("*.png")):
             local_masks_present = True
-            log.info(f"Local masks found in {mask_folder}")
+            log.debug(f"Local masks found in {mask_folder}")
 
         return local_masks_present, mask_folder
     
@@ -105,7 +105,7 @@ class CropProcessor:
 
                         crop_count += 1
 
-        log.info(f"Processed {mask_path}, created {crop_count} crops.")
+        log.debug(f"Processed {mask_path}, created {crop_count} crops.")
         return crop_count
 
     def process_all(self):
