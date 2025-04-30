@@ -86,7 +86,7 @@ def main():
     version_dir = os.environ.get("VERSION_DIR", "")
     project_name = os.environ.get("PROJECT_NAME", "unknown_project")
     
-    image_url = f"https://raw.githubusercontent.com/{repo}/training-artifacts/main/assets/metrics_{run_id}.png"
+    image_url = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/metrics_{run_id}.png"
     image_md = f"![Training Plots]({image_url})"
 
     run_info_file = "logs/run_info.json"
