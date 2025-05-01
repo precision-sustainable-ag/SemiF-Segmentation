@@ -1,62 +1,72 @@
-# SemiF-Segmentation
+# Tutorial: SemiF-Segmentation
 
-## Installing Pytorch on Grace-hopper
+This project provides a pipeline for **image segmentation**.
+It allows users to *query* specific image data from a database, *preprocess* it (e.g., cropping, relabeling), *train* a segmentation model (like UNet or DeepLabV3+) using Pytorch Lightning, and finally *run inference* to generate segmentation masks on new images.
+The entire process is managed using **Hydra** configuration, making it easy to configure experiments and swap components like models or data augmentation techniques.
 
-1. Create a conda environment (python >=3.10)
-2. Install torch and torchvision
-    ```bash
-    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-    ```
 
-### **Script Descriptions**
-
-#### **1. `move_fullsized_data.py`**
-This script manages the movement of full-sized image and mask files from multiple storage locations to a centralized directory. It ensures that both image and mask files are matched correctly, filters out unmatched files (optionally deleting them), and organizes the data into a standardized structure. The script supports copying using multithreading.
-
----
-
-#### **2. `grid_crop.py`**
-This script processes a dataset of images and corresponding masks by cropping them into smaller, fixed-size tiles. It ensures that only tiles containing relevant data (non-zero mask values) are retained. This script supports multiprocessing.
-
----
-
-#### **3. `train_val_test_split.py`**
-This script splits a dataset of images and masks into training, validation, and optional test sets. The split proportions are configurable, and the files are copied into their respective directories for each set. The script ensures that all splits maintain proper image-mask correspondence and supports concurrent file copying.
-
----
-
-#### **4. `remap_masks.py`**
-This script remaps mask values in image files based on predefined class group mappings. It processes train, validation, and test splits separately, converting mask values into simplified categories for specific tasks. The remapped masks are saved into corresponding output directories. The script can process files sequentially or concurrently.
-
----
-
-### Class Format Example (Palmer amaranth)
-```json
-"AMPA": {
-            "class_id": 1,
-            "USDA_symbol": "AMPA",
-            "EPPO": "AMAPA",
-            "group": "dicot",
-            "class": "Magnoliopsida",
-            "subclass": "Caryophyllidae",
-            "order": "Caryophyllales",
-            "family": "Amaranthaceae",
-            "genus": "Amaranthus",
-            "species": "palmeri",
-            "common_name": "Palmer amaranth",
-            "authority": "Watson",
-            "growth_habit": "forb/herb",
-            "duration": "annual",
-            "collection_location": "NC",
-            "category": "warm season weed",
-            "collection_timing": "summer",
-            "link": "https://plants.usda.gov/home/plantProfile?symbol=AMPA",
-            "note": null,
-            "hex": "#1d686e",
-            "rgb": [
-                29,
-                104,
-                110
-            ]   ...
-}
+```mermaid
+flowchart TD
+    A0["Hydra Configuration Management
+"]
+    A1["Task Orchestration (main.py)
+"]
+    A2["Data Querying & Sampling (query.py)
+"]
+    A3["Preprocessing Pipeline (preprocess.py & src/preprocessing/)
+"]
+    A4["Segmentation Model Module (model.py)
+"]
+    A5["Data Loading & Augmentation (datasets.py, augs.py)
+"]
+    A6["Training Orchestration (train.py)
+"]
+    A7["Inference Pipeline (inference.py)
+"]
+    A8["File Synchronization (sync.py)
+"]
+    A0 -- "Provides Config" --> A1
+    A0 -- "Provides Config" --> A2
+    A0 -- "Provides Config" --> A3
+    A0 -- "Provides Config" --> A4
+    A0 -- "Provides Config" --> A5
+    A0 -- "Provides Config" --> A6
+    A0 -- "Provides Config" --> A7
+    A0 -- "Provides Config" --> A8
+    A1 -- "Calls Query Task" --> A2
+    A1 -- "Calls Preprocess Task" --> A3
+    A1 -- "Calls Train Task" --> A6
+    A1 -- "Calls Inference Task" --> A7
+    A1 -- "Calls Sync Task" --> A8
+    A2 -- "Provides data list" --> A3
+    A3 -- "Prepares data for Loading" --> A5
+    A4 -- "Provides Model for Inference" --> A7
+    A5 -- "Provides data batches" --> A6
+    A6 -- "Instantiates & Trains Model" --> A4
+    A8 -- "Updates DB for Query" --> A2
 ```
+
+## Chapters
+
+1. [Task Orchestration (`main.py`)
+](docs/01_task_orchestration___main_py___.md)
+2. [Hydra Configuration Management
+](docs/02_hydra_configuration_management_.md)
+3. [Data Querying & Sampling (`query.py`)
+](docs/03_data_querying___sampling___query_py___.md)
+4. [Preprocessing Pipeline (`preprocess.py` & `src/preprocessing/`)
+](docs/04_preprocessing_pipeline___preprocess_py_____src_preprocessing____.md)
+5. [Data Loading & Augmentation (`datasets.py`, `augs.py`)
+](docs/05_data_loading___augmentation___datasets_py____augs_py___.md)
+6. [Segmentation Model Module (`model.py`)
+](docs/06_segmentation_model_module___model_py___.md)
+7. [Training Orchestration (`train.py`)
+](docs/07_training_orchestration___train_py___.md)
+8. [Inference Pipeline (`inference.py`)
+](docs/08_inference_pipeline___inference_py___.md)
+9. [File Synchronization (`sync.py`)
+](docs/09_file_synchronization___sync_py___.md)
+
+---
+
+Generated by [AI Codebase Knowledge Builder](https://github.com/The-Pocket/Tutorial-Codebase-Knowledge)
