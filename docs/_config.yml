@@ -1,6 +1,14 @@
 title: SemiF-Segmentation Tutorial
 remote_theme: just-the-docs/just-the-docs
 
+# Navigation
+nav_sort: case_sensitive
+
+# Aux links (shown in upper right)
+aux_links:
+  "View on GitHub":
+    - "https://github.com/precision-sustainable-ag/SemiF-Segmentation"
+
 color_scheme: light
 
 aux_links:
@@ -8,7 +16,10 @@ aux_links:
     - "https://github.com/precision-sustainable-ag/SemiF-Segmentation"
 
 mermaid:
-  version: "10.4.0"
+  version: "11.6.0"  # Pick the version you want
+  # Default configuration
+  config: |
+    directionLR
 
 callouts:
   note:
@@ -20,3 +31,8 @@ callouts:
   best-practice:
     title: Best Practice
     color: green
+
+# The custom navigation
+nav:
+  - Home: index.md       # Link to your main docs index
+  - GitHub: "https://github.com/precision-sustainable-ag/SemiF-Segmentation"
