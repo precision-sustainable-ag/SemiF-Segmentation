@@ -1,6 +1,5 @@
 title: SemiF-Segmentation Tutorial
-
-remote_theme: pmarsceill/docsy-jekyll
+remote_theme: just-the-docs/just-the-docs
 
 # Navigation
 nav_sort: case_sensitive
@@ -10,7 +9,7 @@ aux_links:
   "View on GitHub":
     - "https://github.com/precision-sustainable-ag/SemiF-Segmentation"
 
-color_scheme: light
+color_scheme: dark
 
 aux_links:
   "View on GitHub":
