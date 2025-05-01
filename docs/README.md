@@ -11,21 +11,21 @@ The entire process is managed using **Hydra** configuration, making it easy to c
 flowchart TD
     A0["Hydra Configuration Management
 "]
-    A1["Task Orchestration (`main.py`)
+    A1["Task Orchestration ('main.py')
 "]
-    A2["Data Querying & Sampling (`query.py`)
+    A2["Data Querying & Sampling ('query.py')
 "]
-    A3["Preprocessing Pipeline (`preprocess.py` & `src/preprocessing/`)
+    A3["Preprocessing Pipeline ('preprocess.py' & 'src/preprocessing/')
 "]
-    A4["Segmentation Model Module (`model.py`)
+    A4["Segmentation Model Module ('model.py')
 "]
-    A5["Data Loading & Augmentation (`datasets.py`, `augs.py`)
+    A5["Data Loading & Augmentation ('datasets.py', 'augs.py')
 "]
-    A6["Training Orchestration (`train.py`)
+    A6["Training Orchestration ('train.py')
 "]
-    A7["Inference Pipeline (`inference.py`)
+    A7["Inference Pipeline ('inference.py')
 "]
-    A8["File Synchronization (`sync.py`)
+    A8["File Synchronization ('sync.py')
 "]
     A0 -- "Provides Config" --> A1
     A0 -- "Provides Config" --> A2
