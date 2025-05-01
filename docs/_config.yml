@@ -1,6 +1,6 @@
 title: SemiF-Segmentation Tutorial
-# remote_theme: just-the-docs/just-the-docs
-remote_theme: mmistakes/minimal-mistakes
+
+remote_theme: pmarsceill/docsy-jekyll
 
 # Navigation
 nav_sort: case_sensitive
