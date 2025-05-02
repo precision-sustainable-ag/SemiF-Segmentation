@@ -1,5 +1,5 @@
 mode: train
-epochs: 50
+epochs: 1
 batch_size: 8
 seed: 42
 augment: default

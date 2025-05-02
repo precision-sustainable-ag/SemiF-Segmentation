@@ -10,7 +10,7 @@ defaults:
   - _self_                   # Ensures overriding behavior
 
 project:
-  name: grasses_001
+  name: test_gh_actions_001
 
 mode: ??? # required argument for command line. Either sync, preprocess, train, or inference
 
