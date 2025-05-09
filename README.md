@@ -7,24 +7,16 @@ The entire process is managed using **Hydra** configuration, making it easy to c
 
 ```mermaid
 flowchart TD
-    A0["Hydra Configuration Management
-"]
-    A1["Task Orchestration (main.py)
-"]
-    A2["Data Querying & Sampling (query.py)
-"]
-    A3["Preprocessing Pipeline (preprocess.py & src/preprocessing/)
-"]
-    A4["Segmentation Model Module (model.py)
-"]
-    A5["Data Loading & Augmentation (datasets.py, augs.py)
-"]
-    A6["Training Orchestration (train.py)
-"]
-    A7["Inference Pipeline (inference.py)
-"]
-    A8["File Synchronization (sync.py)
-"]
+    A0["Hydra Configuration Management"]
+    A1["Task Orchestration (main.py)"]
+    A2["Data Querying & Sampling (query.py)"]
+    A3["Preprocessing Pipeline (preprocess.py & src/preprocessing/)"]
+    A4["Segmentation Model Module (model.py)"]
+    A5["Data Loading & Augmentation (datasets.py, augs.py)"]
+    A6["Training Orchestration (train.py)"]
+    A7["Inference Pipeline (inference.py)"]
+    A8["File Synchronization (sync.py)"]
+
     A0 -- "Provides Config" --> A1
     A0 -- "Provides Config" --> A2
     A0 -- "Provides Config" --> A3
@@ -33,16 +25,19 @@ flowchart TD
     A0 -- "Provides Config" --> A6
     A0 -- "Provides Config" --> A7
     A0 -- "Provides Config" --> A8
+
     A1 -- "Calls Query Task" --> A2
     A1 -- "Calls Preprocess Task" --> A3
     A1 -- "Calls Train Task" --> A6
     A1 -- "Calls Inference Task" --> A7
     A1 -- "Calls Sync Task" --> A8
+
     A2 -- "Provides data list" --> A3
-    A3 -- "Prepares data for Loading" --> A5
-    A4 -- "Provides Model for Inference" --> A7
-    A5 -- "Provides data batches" --> A6
+    A3 -- "Prepares data for Loading" --> A6
+    A6 -- "Uses DataLoader" --> A5
+    A5 -- "Provides data batches" --> A4
     A6 -- "Instantiates & Trains Model" --> A4
+    A4 -- "Provides Model for Inference" --> A7
     A8 -- "Updates DB for Query" --> A2
 ```
 

@@ -12,8 +12,8 @@ remove_nontargets:
   remove_colorchecker: True
 
 grid_crop:
-  crop_height: 512
-  crop_width: 512
+  crop_height: 1024
+  crop_width: 1024
 
 remap_masks:
   group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
