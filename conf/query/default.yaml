@@ -1,8 +1,8 @@
 sample:
     multi_domain_balanced:
       enabled: true
-      domains: [category.common_name,bbox_bin]
-      samples_per_unique_domain: 50
+      domains: [bbox_bin] # [category.common_name,bbox_bin]
+      samples_per_unique_domain: 500
       replace: false # Allow or disallow sampling of the same row more than once.
 
     random:
@@ -17,26 +17,26 @@ validated:
 category:
   enabled: true
   common_name:
-    - barley
-    - barnyardgrass
-    - black oats
-    - broadleaf signalgrass
-    - cereal rye
-    - fall panicum
-    - giant foxtail
-    - goosegrass
-    - italian ryegrass
-    - johnsongrass
-    - jungle rice
-    - large crabgrass
-    - maize
-    - oats
-    - purple nutsedge
-    - sprawling signalgrass
-    - texas millet
-    - triticale
-    - winter wheat
-    - yellow foxtail
+    # - barley
+    # - barnyardgrass
+    # - black oats
+    # - broadleaf signalgrass
+    # - cereal rye
+    # - fall panicum
+    # - giant foxtail
+    # - goosegrass
+    # - italian ryegrass
+    # - johnsongrass
+    # - jungle rice
+    # - large crabgrass
+    # - maize
+    # - oats
+    # - purple nutsedge
+    # - sprawling signalgrass
+    # - texas millet
+    # - triticale
+    # - winter wheat
+    # - yellow foxtail
   # - barley
   # - barnyardgrass
   # - black oats
@@ -52,7 +52,7 @@ category:
   # - fall panicum
   # - giant foxtail
   # - goosegrass
-  # - hairy vetch
+    - hairy vetch
   # - horseweed
   # - italian ryegrass
   # - jimson weed
@@ -113,8 +113,8 @@ morphological:
 
   num_components: # not tested
     enabled: false
-    min:
-    max:
+    min: 1
+    max: 35
 
   non_target_weed: # not tested
     enabled: false

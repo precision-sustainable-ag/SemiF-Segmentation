@@ -6,13 +6,13 @@ That's where **Hydra** comes in!
 
 ## What Problem Does Hydra Solve?
 
-Imagine you're baking a cake. You have a recipe book (`conf/`) filled with different recipes (configuration files). One recipe might be for a vanilla cake with specific ingredients and baking times. Another might be for a chocolate cake.
+Hydra helps manage configuration cleanly and flexibly.
 
-Now, imagine you want to bake the vanilla cake, but instead of using regular sugar, you want to use brown sugar. Or maybe you want to double the amount of vanilla extract.
+Think of your config files (conf/) like recipes for baking a cake. One recipe might be for a vanilla cake, another for chocolate. You might want to tweak ingredients—like using brown sugar instead of white—without overwriting the original.
 
-**Without Hydra:** You might have to scribble directly on the recipe page in the book, making it messy and hard to remember the original recipe. In code, this is like *hardcoding* values directly into your Python scripts (`src/train.py`, `src/preprocess.py`). If you want to change the learning rate for training, you'd have to find the line in `src/train.py` and edit it. This gets complicated quickly, especially when you want to try many different variations (experiments).
+Without Hydra: You’d have to edit your Python scripts directly (e.g., src/train.py), hardcoding changes like learning rate or model type. This becomes messy and error-prone when running many experiments.
 
-**With Hydra:** Hydra acts like a master chef's assistant. It reads the recipes from your recipe book (`conf/`). If you want to change an ingredient (like the learning rate) or even swap the entire recipe (like switching from a `DeepLabV3Plus` model to a `UNet` model), you just tell the assistant *before* starting. You can do this easily through the command line or by creating a new, clean recipe variation. Hydra keeps everything organized, making it easy to run experiments and know *exactly* what settings were used each time.
+With Hydra: Hydra acts like an assistant who reads the recipe and applies your custom changes cleanly—no need to modify source code. You can override settings via command line or structured config files, making it easy to manage experiments and track what was used.
 
 **Use Case:** Let's say you want to train your segmentation model. The default recipe uses the `DeepLabV3Plus` model with a learning rate of `0.001`. But you want to try training with a `UNet` model instead, and also experiment with a different learning rate, say `0.005`. Hydra lets you do this without touching the main code, just by changing instructions when you run the script.
 

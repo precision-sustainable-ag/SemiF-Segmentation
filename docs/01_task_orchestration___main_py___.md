@@ -1,23 +1,19 @@
 # Chapter 1: Task Orchestration (`main.py`)
 
-Welcome to the SemiF-Segmentation project tutorial! We're excited to guide you through how this project works.
+Welcome to the SemiF-Segmentation tutorial. This chapter explains how main.py helps manage different tasks like preprocessing, training, and inference.
 
-Imagine you're working on a big project, like building a model car. There are several steps: gathering the parts, assembling the body, painting, adding details, etc. You wouldn't want to do *everything* every single time you work on it. Sometimes you just want to paint, other times you just want to assemble. How do you manage these different tasks easily?
-
-In our project, `SemiF-Segmentation`, we have similar steps for processing images and training models: preparing data (`preprocess`), training the model (`train`), using the model to make predictions (`inference`), and a few others. Trying to manage all this in one giant script would be messy!
-
-This is where `main.py` comes in. Think of it as the **Project Manager** or a **Central Dispatcher**.
+There are several steps in building a DL model: preparing the dataset, preprocessing, training the model, evaluating results, and running inference. You wouldn’t want to run every step each time. Sometimes you just want to preprocess data; other times, you only need to retrain or run inference. We manage these tasks cleanly and efficiently using the `main.py` entry point. You can think of `main.py` as the **Project Manager** or a **Central Dispatcher**.
 
 ## What Problem Does `main.py` Solve?
 
-`main.py` solves the problem of **organization and control**. It provides a single, simple way to tell the project *which specific task* you want to perform right now, without needing to dig through different files or run complicated commands.
+`main.py` provides a single, simple way to tell the project *which specific task* you want to perform right now.
 
 **Use Case:** Let's say you've already prepared your data and now you just want to **train** your segmentation model. Instead of finding and running `src/train.py` directly (and maybe forgetting some setup steps), you can simply tell `main.py` what you want to do.
 
 ## Key Concepts
 
 1.  **The Conductor (`main.py`):** This is the main script you interact with from your command line. It's the single entry point for most operations.
-2.  **The Task (`mode`):** This is a special instruction you give to `main.py` to specify *what* you want to do. Examples include `train`, `preprocess`, `inference`, `query`, `sync`. You provide this `mode` when you run the script.
+2.  **The Task (`mode`):** This is a special instruction you give to `main.py` to specify *what* you want to do. Examples include `sync`, `query`, `train`, `preprocess`, `inference`. You provide this `mode` when you run the script.
 3.  **The Specialists (e.g., `src/train.py`, `src/preprocess.py`):** These are separate Python scripts, each designed to perform one specific task very well. `main.py` (the conductor) knows about these specialists and calls the correct one based on the `mode` you provide.
 
 ## How to Use `main.py`
@@ -64,27 +60,6 @@ Let's peek behind the curtain to see how `main.py` works as the dispatcher.
 5.  **Manager calls Specialist (`train.py`):** The manager finds the Training Specialist (`train.py`) and says, "Here are the project settings (the configuration `cfg`), please start the training process."
 6.  **Training Specialist (`train.py`):** Gets the instructions and configuration, and starts its work (loading data, training the model).
 7.  **Completion:** Once the specialist finishes, control returns to the manager, and the overall process ends.
-
-**Visualizing the Flow:**
-
-Here's a simple diagram showing the sequence:
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant M as main.py (Project Manager)
-    participant R as TASK_REGISTRY (List of Specialists)
-    participant T as src/train.py (Training Specialist)
-
-    U->>M: Run command: `python main.py mode=train`
-    M->>M: Reads configuration, identifies `mode = "train"`
-    M->>R: Looks up the task name "train"
-    R-->>M: Returns the function from `src/train.py`
-    M->>T: Calls the `main` function within `src/train.py`, passing configuration
-    Note right of T: `src/train.py` executes the training steps...
-    T-->>M: Training function completes
-    M-->>U: Script finishes
-```
 
 ## Diving Deeper into the Code (`main.py`)
 
@@ -187,7 +162,7 @@ project:
   name: grasses_001
 
 # This 'mode' must be provided when running main.py
-mode: ??? # required argument for command line. Either sync, preprocess, train, or inference
+mode: ??? # required argument for command line. Either sync, query, preprocess, train, or inference
 
 # ... other settings ...
 ```
@@ -228,18 +203,17 @@ def main(cfg: DictConfig):
 
 ## Conclusion
 
-Congratulations! You've learned about the role of `main.py` as the central **Task Orchestrator** in the `SemiF-Segmentation` project.
+In summary, `main.py` is the entry point in the `SemiF-Segmentation` pipeline.
 
 *   It acts like a **project manager**, providing a single entry point to run different tasks.
 *   You tell it which task to run using the `mode=` argument (e.g., `mode=train`).
 *   It uses a `TASK_REGISTRY` to find the correct "specialist" script (like `src/train.py`) for the requested `mode`.
 *   It calls the specialist script, passing along all necessary configuration settings.
 
-This design keeps the project well-organized, making it easy to manage and execute different stages like data preparation, training, and inference.
 
-You might be wondering how all those settings (`cfg`) are managed and passed around. That's handled by a powerful tool called Hydra. In the next chapter, we'll dive into how configuration works in this project.
+All these settings (`cfg`) that are managed and passed around are handled by Hydra. In the next chapter, we'll talk about how configurations works in this project.
 
-Ready to learn more? Let's move on to [Chapter 2: Hydra Configuration Management](02_hydra_configuration_management_.md)!
+[Chapter 2: Hydra Configuration Management](02_hydra_configuration_management_.md)!
 
 ---
 
