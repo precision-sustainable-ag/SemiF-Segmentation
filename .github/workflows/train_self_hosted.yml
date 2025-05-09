@@ -18,17 +18,17 @@ jobs:
           source ~/miniconda3/etc/profile.d/conda.sh
           conda activate torch
 
-      - name: Sync data (only if config or batch list changes)
+      - name: Sync data
         if: ${{ !contains(github.event.head_commit.message, 'TRAIN_ONLY') }}
         run: |
           python main.py mode=sync
 
-      - name: Query (only if query config changes)
+      - name: Query
         if: ${{ !contains(github.event.head_commit.message, 'TRAIN_ONLY') }}
         run: |
           python main.py mode=query
 
-      - name: Preprocess (only if preprocessing config or augmentations change)
+      - name: Preprocess
         if: ${{ !contains(github.event.head_commit.message, 'TRAIN_ONLY') }}
         run: |
           python main.py mode=preprocess
