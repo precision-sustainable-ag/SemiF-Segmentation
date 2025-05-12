@@ -170,7 +170,7 @@ def train_aug(cfg):
     # === Noise Transforms ===
     noise_transforms = get_noise_transforms(t_cfg)
     if noise_transforms:
-        transforms.append(A.SomeOf(noise_transforms, n=min(len(noise_transforms), 1)), replace=False, p=1.0)
+        transforms.append(A.SomeOf(noise_transforms, n=min(len(noise_transforms), 1), replace=False, p=1.0))
 
     # === Shuffle overall order ===
     random.shuffle(transforms)
