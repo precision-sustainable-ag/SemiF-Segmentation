@@ -19,7 +19,7 @@ primary_storage: /mnt/research-projects/s/screberg/longterm_images
 secondary_storage: /mnt/research-projects/s/screberg/GROW_DATA
 tertiary_storage: /mnt/research-projects/s/screberg/longterm_images2
 
-inference_output_dir: ${paths.project_inference_dir}/${inference.inference_subname}/version_${inference.version}/${job_now_date}_${job_now_time}
+inference_output_dir: ${paths.project_inference_dir}/${inference.inference.inference_subname}/version_${inference.inference.version}/${job_now_date}_${job_now_time}
 
 # path to cropped data
 crop_suffix: ${preprocess.grid_crop.crop_height}x${preprocess.grid_crop.crop_width}
@@ -39,7 +39,7 @@ dataset_subdirs:
   - masks
 
 inference:
-  checkpoints: ${paths.project_train_dir}/version_${inference.version}/checkpoints
+  checkpoints: ${paths.project_train_dir}/version_${inference.inference.version}/checkpoints
 
 
 # DB

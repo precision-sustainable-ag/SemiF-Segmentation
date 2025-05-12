@@ -1,29 +1,36 @@
-inference_subname: test_set
-input_dir: ../Field-AnnotationPipeline/data/temp/TX_2023-10-06/cutouts/
+tasks:
+  get_dataset: true
+  inference: true
 
-version: 2
+get_dataset:
+  query: true
+  collect_paths: true
+  sample_size: 10
+  images: true
+  metadata: true
+  masks: false
 
-rescale_factor: .75
-threshold: 0.5
-use_normalization: true
+inference:
+  inference_subname: test_set
+  version: 4 # Uses cfg.project.name to find the model
+  rescale_factor: 1.0
+  threshold: 0.5
+  use_normalization: true
+  cuda_visible_devices: [9]
+  seed: 422
+  bbox_crop: true
 
-cuda_visible_devices: [9]
+  plot:
+    overlays: true
+    comparisons: true
+    dpi: 300
+    transparent: true
 
-samplek: 10
-
-seed: 422
-
-plot:
-  overlays: true
-  comparisons: true
-  dpi: 300
-  transparent: true
-
-mean: # default values if no rgb_std.json in the datastats project folder exists
-  - 0.34294407046243913
-  - 0.32145567842088424
-  - 0.28347563540363635
-std:
-  - 0.18942575591144425
-  - 0.19259909206363238
-  - 0.17072289022513365
+  mean: # default values if no rgb_std.json in the datastats project folder exists
+    - 0.34294407046243913
+    - 0.32145567842088424
+    - 0.28347563540363635
+  std:
+    - 0.18942575591144425
+    - 0.19259909206363238
+    - 0.17072289022513365
