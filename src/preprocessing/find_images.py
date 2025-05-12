@@ -8,14 +8,15 @@ from tqdm import tqdm
 log = logging.getLogger(__name__)
 
 class DatasetManager:
-    def __init__(self, cfg: DictConfig):
-        self.query_result = Path(cfg.paths.project_mode_dir).parent / "query" / f"{cfg.project.name}.json"
+    def __init__(self, cfg: DictConfig, inference: bool = False):
+        self.query_dir = Path(cfg.paths.project_query_dir) if not inference else Path(cfg.paths.project_inference_dir) / "data"
+        self.query_result = self.query_dir / f"{cfg.project.name}.json"
         self.primary_storage = Path(cfg.paths.primary_storage, "semifield-developed-images")
         self.secondary_storage = Path(cfg.paths.secondary_storage, "semifield-developed-images")
         self.tertiary_storage = Path(cfg.paths.tertiary_storage, "semifield-developed-images")
 
         # self.destination_dir = Path(cfg.paths.data_dir, cfg.project.name)
-        self.destination_dir = Path(cfg.paths.project_mode_dir) / "data"
+        self.destination_dir = Path(cfg.paths.project_preprocess_dir) / "data" if not inference else Path(cfg.paths.project_inference_dir) / "data"
         self.destination_dir.mkdir(parents=True, exist_ok=True)
         self.data = self.load_data()
         self.images = []

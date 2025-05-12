@@ -1,129 +1,181 @@
+import logging
 import albumentations as A
+from typing import List, Callable, Dict, Any
+import random
+log = logging.getLogger(__name__)
 
+
+def get_noise_transforms(cfg) -> List[A.BasicTransform]:
+    if not cfg.noise_transforms.enable:
+        return []
+
+    transforms = []
+
+    for name, params in cfg.noise_transforms.transforms.items():
+        if not params.enable:
+            continue
+
+        if name == "MultiplicativeNoise":
+            transforms.append(A.MultiplicativeNoise(
+                multiplier=tuple(params.multiplier),
+                per_channel=params.per_channel,
+                p=params.p
+            ))
+
+        elif name == "Downscale":
+            transforms.append(A.Downscale(
+                scale_min=params.scale_min,
+                scale_max=params.scale_max,
+                p=params.p
+            ))
+
+        elif name == "GridDistortion":
+            transforms.append(A.GridDistortion(
+                num_steps=params.num_steps,
+                distort_limit=params.distort_limit,
+                p=params.p
+            ))
+
+        elif name == "ElasticTransform":
+            transforms.append(A.ElasticTransform(
+                alpha=params.alpha,
+                sigma=params.sigma,
+                alpha_affine=params.alpha_affine,
+                p=params.p
+            ))
+
+        elif name == "GaussNoise":
+            transforms.append(A.GaussNoise(
+                mean=(params.mean_range_min, params.mean_range_max),
+                per_channel=params.per_channel,
+                noise_scale_factor=params.noise_scale_factor,
+                p=params.p
+            ))
+
+        elif name == "ISONoise":
+            transforms.append(A.ISONoise(
+                color_shift=(params.color_shift_min, params.color_shift_max),
+                intensity=(params.intensity_min, params.intensity_max),
+                p=params.p
+            ))
+
+        elif name == "JpegCompression":
+            transforms.append(A.JpegCompression(
+                quality_lower=params.quality_lower,
+                quality_upper=params.quality_upper,
+                p=params.p
+            ))
+
+    return transforms
+
+
+def get_geometric_transforms(g_cfg, img_hw) -> List[A.BasicTransform]:
+    transforms = []
+    if g_cfg.horizontal_flip.enable:
+        transforms.append(A.HorizontalFlip(p=g_cfg.horizontal_flip.p))
+
+    if g_cfg.vertical_flip.enable:
+        transforms.append(A.VerticalFlip(p=g_cfg.vertical_flip.p))
+
+    if g_cfg.affine.enable:
+        transforms.append(A.Affine(**g_cfg.affine))
+
+    if g_cfg.padding.enable:
+        transforms.append(A.PadIfNeeded(min_height=img_hw[0], min_width=img_hw[1], p=g_cfg.padding.p))
+
+    if g_cfg.random_crop.enable:
+        transforms.append(A.RandomCrop(height=img_hw[0], width=img_hw[1], p=g_cfg.random_crop.p))
+
+    if g_cfg.perspective.enable:
+        transforms.append(A.Perspective(scale=g_cfg.perspective.scale, p=g_cfg.perspective.p))
+
+    if g_cfg.optical_distortion.enable:
+        transforms.append(A.OpticalDistortion(distort_limit=g_cfg.optical_distortion.distort_limit, p=g_cfg.optical_distortion.p))
+
+    return transforms
+
+
+def get_photometric_transforms(cfg) -> List[A.BasicTransform]:
+    transforms = []
+
+    if cfg.rgb_shift.enable:
+        transforms.append(A.RGBShift(
+            r_shift_limit=cfg.rgb_shift.r_shift_limit,
+            g_shift_limit=cfg.rgb_shift.g_shift_limit,
+            b_shift_limit=cfg.rgb_shift.b_shift_limit,
+            p=cfg.rgb_shift.p
+        ))
+
+    if cfg.random_gamma.enable:
+        transforms.append(A.RandomGamma(
+            gamma_limit=tuple(cfg.random_gamma.gamma_limit),
+            p=cfg.random_gamma.p
+        ))
+
+    if cfg.to_gray.enable:
+        transforms.append(A.ToGray(p=cfg.to_gray.p))
+
+    if cfg.channel_shuffle.enable:
+        transforms.append(A.ChannelShuffle(p=cfg.channel_shuffle.p))
+
+    if cfg.invert_image.enable:
+        transforms.append(A.InvertImg(p=cfg.invert_image.p))
+
+    if cfg.color_jitter.enable:
+        transforms.append(A.ColorJitter(p=cfg.color_jitter.p))
+
+    if cfg.huesatval.enable:
+        transforms.append(A.HueSaturationValue(
+            hue_shift_limit=cfg.huesatval.hue_shift_limit,
+            sat_shift_limit=cfg.huesatval.sat_shift_limit,
+            val_shift_limit=cfg.huesatval.val_shift_limit,
+            p=cfg.huesatval.p
+        ))
+
+    if cfg.clahe.enable:
+        transforms.append(A.CLAHE(
+            clip_limit=cfg.clahe.clip_limit,
+            tile_grid_size=tuple(cfg.clahe.tile_grid_size),
+            p=cfg.clahe.p
+        ))
+
+    if cfg.brightness_contrast.enable:
+        transforms.append(A.RandomBrightnessContrast(p=cfg.brightness_contrast.p))
+
+    if cfg.equalize.enable:
+        transforms.append(A.Equalize(p=cfg.equalize.p))
+
+    if cfg.random_tone_curve.enable:
+        transforms.append(A.RandomToneCurve(p=cfg.random_tone_curve.p))
+
+    return transforms
+
+# === Main Augmentation Builders === #
 def train_aug(cfg):
-    """
-    Dynamically builds training augmentations based on the configuration.
-    """
     img_hw = tuple(cfg.augment.train.img_hw)
-    train_transform = []
+    t_cfg = cfg.augment.train
 
-    # Add augmentations based on config flags
-    if cfg.augment.train.horizontal_flip:
-        train_transform.append(A.HorizontalFlip(p=0.5))
-    
-    if cfg.augment.train.affine.enable:
-        a_cfg = cfg.augment.train.affine
-        train_transform.append(
-            A.Affine(
-                scale=a_cfg.scale, 
-                translate_percent=a_cfg.translate_percent, 
-                translate_px=a_cfg.translate_px, 
-                rotate=a_cfg.rotate, 
-                shear=a_cfg.shear, 
-                interpolation=a_cfg.interpolation, 
-                mask_interpolation=a_cfg.mask_interpolation, 
-                fit_output=a_cfg.fit_output, 
-                keep_ratio=a_cfg.keep_ratio, 
-                rotate_method=a_cfg.rotate_method, 
-                balanced_scale=a_cfg.balanced_scale, 
-                border_mode=a_cfg.border_mode, 
-                fill=a_cfg.fill, 
-                fill_mask=a_cfg.fill_mask,
-                p=a_cfg.p
-                )
-        )
+    transforms = []
 
-    if cfg.augment.train.padding.enable:
-        p_cfg = cfg.augment.train.padding
-        train_transform.append(A.PadIfNeeded(min_height=img_hw[0], min_width=img_hw[1], p=p_cfg.p))
-    
-    if cfg.augment.train.random_crop.enable:
-        rc_cfg = cfg.augment.train.random_crop
-        train_transform.append(A.RandomCrop(height=img_hw[0], width=img_hw[1], p=rc_cfg.p))
-    
-    if cfg.augment.train.gauss_noise.enable:
-        gn_cfg = cfg.augment.train.gauss_noise
-        train_transform.append(A.GaussNoise(p=gn_cfg.p, noise_scale_factor=gn_cfg.noise_scale_factor))
-    
-    if cfg.augment.train.perspective.enable:
-        p_cfg = cfg.augment.train.perspective
-        train_transform.append(A.Perspective(p=p_cfg.p, scale=p_cfg.scale))
-    
-    # Add color transformations
-    if cfg.augment.train.color_transforms.enable:
-        color_augs = []
-        for aug in cfg.augment.train.color_transforms.transforms:
-            if aug == "CLAHE":
-                color_augs.append(A.CLAHE(p=.5))
-            elif aug == "RandomGamma":
-                color_augs.append(A.RandomGamma(p=.5))
-        train_transform.append(A.OneOf(color_augs, p=cfg.augment.train.color_transforms.p))
+    # === Geometric Transforms ===
+    geo_transforms = get_geometric_transforms(t_cfg.geometrics_transforms, img_hw)
+    if geo_transforms:
+        transforms.append(A.SomeOf(geo_transforms, n=min(len(geo_transforms), 3), replace=False, p=1.0))
 
-    # Add distortion transformations
-    if cfg.augment.train.optical_distortion.enable:
-        od_cfg = cfg.augment.train.optical_distortion
-        train_transform.append(A.OpticalDistortion(distort_limit=od_cfg.distort_limit, p=od_cfg.p))
+    # === Photometric Transforms ===
+    photo_transforms = get_photometric_transforms(t_cfg.photometrics_transforms)
+    if photo_transforms:
+        transforms.append(A.SomeOf(photo_transforms, n=min(len(photo_transforms), 2), replace=False, p=1.0))
 
-    # Add blur transformations
-    if cfg.augment.train.blur_transforms.enable:
-        blur_augs = []
-        for aug in cfg.augment.train.blur_transforms.transforms:
-            if aug == "Sharpen":
-                blur_augs.append(A.Sharpen(p=1))
-            elif aug == "Blur":
-                blur_augs.append(A.Blur(blur_limit=cfg.augment.train.blur_transforms.blur_limit, p=1))
-            elif aug == "MotionBlur":
-                blur_augs.append(A.MotionBlur(blur_limit=cfg.augment.train.blur_transforms.blur_limit, p=1))
-        train_transform.append(A.OneOf(blur_augs, p=cfg.augment.train.blur_transforms.p))
+    # === Noise Transforms ===
+    noise_transforms = get_noise_transforms(t_cfg)
+    if noise_transforms:
+        transforms.append(A.SomeOf(noise_transforms, n=min(len(noise_transforms), 1), replace=False, p=1.0))
 
-    # Add hue/saturation transformations
-    if cfg.augment.train.hue_saturation.enable:
-        hs_cfg = cfg.augment.train.hue_saturation
-        hue_augs = []
-        for aug in cfg.augment.train.hue_saturation.transforms:
-            if aug == "RandomBrightnessContrast":
-                hue_augs.append(
-                    A.RandomBrightnessContrast(
-                        brightness_limit=hs_cfg.brightness_limit, 
-                        contrast_limit=hs_cfg.contrast_limit,
-                        p=1
-                        )
-                    )
-                
-            elif aug == "HueSaturationValue":
-                hue_augs.append(
-                    A.HueSaturationValue(
-                        hue_shift_limit=hs_cfg.hue_shift_limit,
-                        sat_shift_limit=hs_cfg.sat_shift_limit,
-                        val_shift_limit=hs_cfg.val_shift_limit,
-                        p=1))
-        train_transform.append(A.OneOf(hue_augs, p=cfg.augment.train.hue_saturation.p))
+    # === Shuffle overall order ===
+    random.shuffle(transforms)
+    return A.Compose(transforms)
 
-    # Add noise transformations
-    if cfg.augment.train.noise_transforms.enable:
-        noise_augs = []
-        for aug, vals in cfg.augment.train.noise_transforms.transforms.items():
-            if aug == "MultiplicativeNoise":
-                noise_augs.append(A.MultiplicativeNoise(multiplier=vals["multiplier"], per_channel=vals["per_channel"], p=vals["p"]))
-            elif aug == "JpegCompression":
-                noise_augs.append(A.JpegCompression(quality_lower=vals["quality_lower"], quality_upper=vals["quality_upper"], p=vals["p"]))
-            elif aug == "Downscale":
-                noise_augs.append(A.Downscale(scale_min=vals["scale_min"], scale_max=vals["scale_max"], p=vals["p"]))
-            elif aug == "GridDistortion":
-                noise_augs.append(A.GridDistortion(num_steps=vals["num_steps"], distort_limit=vals["distort_limit"], p=vals["p"]))
-            elif aug == "ElasticTransform":
-                noise_augs.append(A.ElasticTransform(alpha=vals["alpha"], sigma=vals["sigma"], alpha_affine=vals["alpha_affine"], p=vals["p"]))
-            elif aug == "GaussNoise":
-                noise_augs.append(A.GaussNoise(mean_range=(vals["mean_range_min"], vals["mean_range_max"]), per_channel=vals['per_channel'], p=vals["p"], noise_scale_factor=vals["noise_scale_factor"]))
-            elif aug == "ISONoise":
-                noise_augs.append(A.ISONoise(color_shift=(vals["color_shift_min"], vals["color_shift_max"]), intensity=(vals["intensity_min"], vals["intensity_max"]), p=vals["p"]))
-        train_transform.append(A.OneOf(noise_augs, p=cfg.augment.train.noise_transforms.one_of_p))
-    
-    if cfg.augment.train.perspective.enable:
-        p_cfg = cfg.augment.train.perspective
-        train_transform.append(A.Perspective(p=p_cfg.p, scale=p_cfg.scale))
-
-    return A.Compose(train_transform)
 
 def val_aug(cfg):
     """

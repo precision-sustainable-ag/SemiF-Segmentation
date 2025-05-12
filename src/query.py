@@ -12,10 +12,10 @@ from omegaconf import DictConfig
 log = logging.getLogger(__name__)
 
 class CutoutQuerySampler:
-    def __init__(self, cfg: DictConfig, table_name: str = "semif_cutouts"):
+    def __init__(self, cfg: DictConfig, table_name: str = "semif_cutouts", inference: bool = False):
         self.cfg = cfg
         self.db_path = Path(cfg.paths.db.db_file)
-        self.output_dir = Path(cfg.paths.project_query_dir)
+        self.output_dir = Path(cfg.paths.project_query_dir) if not inference else Path(cfg.paths.project_inference_dir) / "data"
         self.project_name = cfg.project.name
         self.table_name = table_name
 
@@ -102,41 +102,6 @@ class CutoutQuerySampler:
         if morph.num_components.enabled:
             self.add_condition("json_extract(cutout_props, '$.num_components')", ">=", morph.num_components.min)
             self.add_condition("json_extract(cutout_props, '$.num_components')", "<=", morph.num_components.max)
-
-    # def add_category_condition(self) -> None:
-        # """
-        # Add category filters from the configuration to the query.
-        # Handle cases where category fields can be exact values or lists.
-        # """
-        # category = self.filter.category
-        # for key, value in category.items():
-        #     # Only process if there is a value provided.
-        #     if value:
-        #         if key == 'common_name':
-        #             # Handle common_name case-insensitively.
-        #             # If the value is a list or ListConfig, process it as a list.
-        #             if isinstance(value, (list, omegaconf.listconfig.ListConfig)):
-        #                 names = list(value)  # Convert to a regular list if necessary.
-        #                 # Build placeholders for each name.
-        #                 placeholders = ", ".join("?" for _ in names)
-        #                 # Construct the condition:
-        #                 # LOWER(json_extract(category, '$.common_name')) IN (?, ?, ...)
-        #                 condition = f"LOWER(trim(json_extract(category, '$.common_name'))) IN ({placeholders})"
-        #                 # condition = "LOWER(trim(json_extract(category, '$.common_name'))) = ?"
-        #                 self.conditions.append(condition)
-        #                 # Append the lower-cased names to the parameters.
-        #                 self.params.extend([name.lower().strip() for name in names])
-        #             else:
-        #                 # If value is a single string, use an equality check.
-        #                 # condition = "LOWER(json_extract(category, '$.common_name')) = ?"
-        #                 condition = "LOWER(trim(json_extract(category, '$.common_name'))) = ?"
-        #                 self.conditions.append(condition)
-        #                 self.params.append(value.lower().strip())
-        #         else:
-        #             # For other category keys, apply a simple equality filter.
-        #             condition = f"json_extract(category, '$.{key}') = ?"
-        #             self.conditions.append(condition)
-        #             self.params.append(value)
 
     def build_query(self) -> str:
         base_query = f"SELECT *, LOWER(TRIM(json_extract(category, '$.common_name'))) AS common_name FROM {self.table_name}"
