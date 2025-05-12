@@ -6,6 +6,7 @@ on:
       - develop
 jobs:
   run_pipeline:
+    if: ${{ !contains(github.event.head_commit.message, 'SKIP-PIPELINE') }}
     runs-on: self-hosted
     timeout-minutes: 4320  # 72 hours
 
@@ -53,7 +54,11 @@ jobs:
           IMAGE_PATH="assets/$IMAGE_NAME"
 
           mkdir -p assets
-          cp "$VERSION_DIR/metrics.png" "$IMAGE_PATH"
+          if [ -f "$VERSION_DIR/metrics.png" ]; then
+            cp "$VERSION_DIR/metrics.png" "$IMAGE_PATH"
+          else
+            echo "⚠️ WARNING: $VERSION_DIR/metrics.png not found. Skipping copy."
+          fi
 
           # Setup Git identity
           git config user.name "github-actions[bot]"

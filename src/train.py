@@ -11,6 +11,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.strategies import DDPStrategy
+from pytorch_lightning.utilities import rank_zero_only
 
 from src.utils.datasets import Dataset
 from src.utils.model import SegmentationModule
@@ -30,6 +31,7 @@ def load_stats(stats_file: Path):
             return np.array(data['mean']), np.array(data['std'])
     return None, None
 
+@rank_zero_only
 def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
     """
     Log run information to the logger for github actions.
@@ -162,7 +164,10 @@ def main(cfg: DictConfig):
     print(f"Validation IoU per images: {valid_per_image_iou}")
     print(f"Validation dataset IoU: {valid_dataset_iou}")
     
-    log_run_info(logger, cfg, val_result)
+    try: 
+        log_run_info(logger, cfg, val_result)
+    except Exception as e:
+        print(f"Error logging run info: {e}")
 
     # Load and Save best full model
     best_model_ckpt_path = best_checkpoint.best_model_path
