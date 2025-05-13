@@ -159,6 +159,9 @@ class SegmentationModule(pl.LightningModule):
             if self.loss_strategy == "DiceWithBoundaryLoss":
                 return DiceWithBoundaryLoss(boundary_weight=0.2)
             
+            if self.loss_strategy == "smpDiceLoss":
+                return smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True, ignore_index=self.ignore_index)
+            
         elif self.mode == "multiclass":
             return smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
         else:
