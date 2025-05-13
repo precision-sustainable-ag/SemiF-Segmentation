@@ -1,82 +1,156 @@
 train:
   img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
-  
-  horizontal_flip: 
+  # img_hw: [512, 512]
+
+  geometrics_transforms:
     enable: true
-    p: 0.1  # Low probability
+    
+    some_of:
+      p: 1.0
+      n: 4
+      replace: false
+    
+    horizontal_flip:
+      enable: true
+      p: 0.5
+    
+    vertical_flip:
+      enable: true
+      p: 0.3
 
-  vertical_flip: 
-    enable: false
-    p: 0.0
-
-  affine: 
-    enable: false
-    scale: 0.0
-    translate_percent: 0.0
-    translate_px: 
-    rotate: [0, 0]
-    shear: 0
-    interpolation: 0 
-    mask_interpolation: 0 
-    fit_output: True
-    keep_ratio: True
-    rotate_method: largest_box
-    balanced_scale: True
-    border_mode: 0
-    fill: 0.0
-    fill_mask: 0.0
-    p: 0.0
-
-  optical_distortion: 
-    enable: false
-    distort_limit: [0.0, 0.0]
-    p: 0.0
-
-  padding: 
-    enable: false
-    p: 0.0
-
-  random_crop: 
-    enable: false
-    p: 0.0
-
-  gauss_noise: 
-    enable: false
-    noise_scale_factor: 0.0
-    p: 0.0 
-
-  perspective: 
-    enable: false
-    scale: [0.0, 0.0]
-    p: 0.0
-
-  color_transforms:
+    affine:
+      enable: true
+      p: 0.8
+      scale: 1.0
+      rotate: [-20, 20]
+      shear: [-10, 10]
+      translate_percent: [-0.03, 0.03]
+      
+    padding:
+      enable: false
+      p: 1.0
+      min_height: 8000
+      min_width: 8000
+      position: "center"
+    
+    crop_and_pad:
+      enable: false
+      p: 1.0
+      percent: [[-0.1,0.1],[-0.1,0.1],[-0.1,0.1], [-0.1,0.1]]
+    
+    elastic_transform:
+      enable: true
+      p: 0.5
+      alpha: 120
+      sigma: 8
+      
+    grid_distortion:
+      enable: true
+      p: 0.5
+      num_steps: 5
+      distort_limit: [-0.15, 0.15]
+    
+    morphological:
+      enable: false
+      p: 1.0
+      scale: [13,15]
+      operation: "dilation"
+    
+    optical_distortion:
+      enable: true
+      p: 0.5
+      distort_limit: [-0.2, 0.2]
+            
+    perspective:
+      enable: true
+      p: 0.5
+      scale: [0.1, 0.3]
+      fit_output: false
+      
+  photometrics_transforms:
     enable: true
-    transforms:
-      - RandomGamma  # Light, deterministic effect
-    p: 0.05  # Very low
-
-  blur_transforms:
-    enable: false
-    transforms: []
-    blur_limit: 0
-    p: 0.0
-
-  hue_saturation:
-    enable: true
-    transforms:
-      - RandomBrightnessContrast
-    brightness_limit: [-0.1, 0.1]
-    contrast_limit: [-0.1, 0.1]  
-    hue_shift_limit: [0, 0]
-    sat_shift_limit: [0, 0]
-    val_shift_limit: [0, 0]
-    p: 0.05
-
+    some_of:
+      p: 1.0
+      n: 2
+      replace: false
+    
+    rgb_shift:
+      enable: false  # DISABLED (aggressive color shift)
+      p: 1.0
+      r_shift_limit: 20
+      g_shift_limit: 20
+      b_shift_limit: 20
+      
+    random_gamma:
+      enable: true
+      p: 0.5
+      gamma_limit: [90, 110]
+      
+    to_gray:
+      enable: false  # DISABLED (too harsh)
+      p: 1.0
+    
+    channel_shuffle:
+      enable: false  # DISABLED (randomized channels bad for plants)
+      p: 1.0
+    
+    invert_image:
+      enable: false  # DISABLED (invert unrealistic)
+      p: 1.0
+    
+    color_jitter:
+      enable: true
+      p: 0.5
+    
+    huesatval:
+      enable: false  # DISABLED (too strong for natural images)
+      p: 1.0
+      hue_shift_limit: 30
+      sat_shift_limit: 40
+      val_shift_limit: 30
+      
+    clahe:
+      enable: true
+      p: 0.5
+      clip_limit: 2.0
+      tile_grid_size: [8, 8]
+          
+    brightness_contrast:
+      enable: true
+      p: 0.7
+    
+    equalize:
+      enable: true
+      p: 0.5
+    
+    random_tone_curve:
+      enable: false  # DISABLED (too aggressive)
+      p: 1.0
+      
   noise_transforms:
-    enable: false
-    one_of_p: 0.0
-    transforms: {}
+    enable: true
+    some_of:
+      p: 1.0
+      n: 1
+      replace: false
+    
+    transforms:
+      MultiplicativeNoise:
+        multiplier: [0.95, 1.05]
+        per_channel: true
+        p: 0.2
+      
+      ISONoise:
+        color_shift_min: 0.01
+        color_shift_max: 0.05
+        intensity_min: 0.05
+        intensity_max: 0.2
+        p: 0.2
+      
+      JpegCompression:
+        quality_lower: 50
+        quality_upper: 90
+        p: 0.3
 
 val:
   img_hw: ${augment.train.img_hw}

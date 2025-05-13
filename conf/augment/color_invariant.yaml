@@ -1,84 +1,152 @@
 train:
-  img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
+  # img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
+  img_hw: [512, 512]
 
   geometrics_transforms:
+    enable: true
+    
+    some_of:
+      p: 1.0
+      n: 3
+      replace: false
+    
     horizontal_flip:
       enable: true
       p: 1.0
+    
     vertical_flip:
       enable: true
       p: 1.0
+
     affine:
-      enable: false
+      enable: true
+      p: 1.0
+      scale: 1.0
+      rotate: [-45, 45]
+      shear: [-15, 15]
+      translate_percent: [-0.05,0.05]
+      
     padding:
       enable: false
       p: 1.0
-    random_crop:
+      min_height: 8000
+      min_width: 8000
+      position: "center"
+    
+    crop_and_pad:
+      enable: false
+      p: 1.0
+      percent: [[-0.1,0.1],[-0.1,0.1],[-0.1,0.1], [-0.1,0.1]]
+    
+    elastic_transform:
       enable: true
       p: 1.0
-    perspective:
+      alpha: 300
+      sigma: 10
+      
+    grid_distortion:
+      enable: true
+      p: 1.0
+      num_steps: 5
+      distort_limit: [-0.3, 0.3]
+      
+    morphological:
       enable: false
+      p: 1.0
+      scale: [13,15]
+      operation: "dilation"
+    
     optical_distortion:
-      enable: false
-
+      enable: true
+      p: 1.0
+      distort_limit: [-0.25, 0.25]
+            
+    perspective:
+      p: 1.0
+      enable: true
+      scale: [0.25, 0.5]
+      fit_output: false
+      
   photometrics_transforms:
+    enable: true
+    some_of:
+        p: 1.0
+        n: 1
+        replace: false
+    
     rgb_shift:
       enable: true
+      p: 1.0
       r_shift_limit: 20
       g_shift_limit: 20
       b_shift_limit: 20
-      p: 1.0
+      
     random_gamma:
       enable: true
-      gamma_limit: [80,120]
       p: 1.0
+      gamma_limit: [80,120]
+      
     to_gray:
       enable: true
       p: 1.0
+    
     channel_shuffle:
       enable: true
       p: 1.0
+    
     invert_image:
       enable: true
       p: 1.0
+    
     color_jitter:
       enable: true
       p: 1.0
+    
     huesatval:
       enable: true
+      p: 1.0
       hue_shift_limit: 30
       sat_shift_limit: 40
       val_shift_limit: 30
-      p: 1.0
+      
     clahe:
       enable: true
+      p: 1.0
       clip_limit: 4.0
       tile_grid_size: [8, 8]
-      p: 1.0
+          
     brightness_contrast:
       enable: true
       p: 1.0
+    
     equalize:
       enable: true
       p: 1.0
+    
     random_tone_curve:
       enable: true
       p: 1.0
       
   noise_transforms:
     enable: false
-    one_of_p: 1.0
+    some_of:
+      p: 1.0
+      n: 2
+      replace: false
+    
     transforms:
       MultiplicativeNoise:
         multiplier: [0.9, 1.1]
         per_channel: true
         p: 0.15
+
       ISONoise:
         color_shift_min: 0.01
         color_shift_max: 0.1
         intensity_min: 0.1
         intensity_max: 0.5
         p: 0.15
+      
       JpegCompression:
         quality_lower: 10
         quality_upper: 70
