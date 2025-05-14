@@ -14,13 +14,18 @@ class DatasetManager:
         self.primary_storage = Path(cfg.paths.primary_storage, "semifield-developed-images")
         self.secondary_storage = Path(cfg.paths.secondary_storage, "semifield-developed-images")
         self.tertiary_storage = Path(cfg.paths.tertiary_storage, "semifield-developed-images")
+        self.use_synthetic = cfg.preprocess.use_synthetic.enable
+        self.use_all_synthetic_subprojects = cfg.preprocess.use_synthetic.use_all_subprojects
+        self.synthetic_project_dir = Path(cfg.paths.synthetic_project_dir)
+        self.synthetic_subproject_dir = Path(self.synthetic_project_dir, cfg.preprocess.use_synthetic.sub_project) if cfg.preprocess.use_synthetic.sub_project is not None else None
 
         # self.destination_dir = Path(cfg.paths.data_dir, cfg.project.name)
         self.destination_dir = Path(cfg.paths.project_preprocess_dir) / "data" if not inference else Path(cfg.paths.project_inference_dir) / "data"
         self.destination_dir.mkdir(parents=True, exist_ok=True)
-        self.data = self.load_data()
+
         self.images = []
         self.masks = []
+        self.metadata = []
 
     def load_data(self) -> List[Dict[str, Union[str, int]]]:
         """Load the dataset from the JSON query result."""
@@ -31,12 +36,35 @@ class DatasetManager:
             else:
                 return data
 
+    def collect_synthetic_paths(self) -> List[Path]:
+        """Collect synthetic image paths from the specified directory."""
+        images, masks = [], []
+        if self.use_synthetic:
+            if self.use_all_synthetic_subprojects:
+                for subproject in self.synthetic_project_dir.iterdir():
+                    
+                    if subproject.is_dir():
+                        image_dir = subproject / "results" / "images"
+                        mask_dir = subproject / "results" / "semantic_masks"
+                        images.extend(list(image_dir.glob("*.jpg")))
+                        masks.extend(list(mask_dir.glob("*.png")))
+            else:
+                images.extend(list(self.synthetic_subproject_dir.glob("results/images/*.jpg")))
+                masks.extend(list(self.synthetic_subproject_dir.glob("results/meta_masks/semantic_masks/*.png")))
+        # Filter out images and masks that do not have a corresponding pair
+        images = [img for img in images if img.stem in {mask.stem for mask in masks}]
+        masks = [mask for mask in masks if mask.stem in {img.stem for img in images}]
+        # Sort the lists to ensure they are in the same order
+        images.sort(key=lambda x: x.stem)
+        masks.sort(key=lambda x: x.stem)
+        return images, masks
+    
     def collect_paths(self) -> List[Path]:
         """Collect file paths for images, masks, and metadata, ensuring all three are present."""
         images, masks, metadata = [], [], []
         storage_paths = [self.primary_storage, self.secondary_storage, self.tertiary_storage]
-
-        for record in tqdm(self.data, leave=False, desc="Collecting paths"):
+        data = self.load_data()
+        for record in tqdm(data, leave=False, desc="Collecting paths"):
             batch = record["batch_id"]
             image_id = record["image_id"]
 
@@ -60,7 +88,12 @@ class DatasetManager:
 
     def load_images_and_masks(self):
         """Load image, mask, and metadata paths, ensuring all three are present."""
-        self.images, self.masks, self.metadata = self.collect_paths()
+        if self.use_synthetic:
+            synthetic_images, synthetic_masks = self.collect_synthetic_paths()
+            self.images.extend(synthetic_images)
+            self.masks.extend(synthetic_masks)
+        else:
+            self.images, self.masks, self.metadata = self.collect_paths()
 
     def write_data_2_text_file(self, data: List[Path], file_path: Path):
         """Write the list of paths to a text file."""

@@ -8,6 +8,12 @@ tasks:
   data_stats: true # successfully tested
   viz_results: false
 
+use_synthetic:
+  enable: true
+  project_name: hairy_vetch
+  sub_project:  # ignored if use_all_subprojects is true
+  use_all_subprojects: true
+
 remove_nontargets:
   remove_colorchecker: True
 

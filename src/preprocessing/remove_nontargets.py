@@ -7,6 +7,7 @@ import hydra
 from omegaconf import DictConfig
 import json
 import logging
+import shutil
 
 log = logging.getLogger(__name__)
 
@@ -15,11 +16,17 @@ class NonTargetRemover:
 
         self.remove_colorchecker=cfg.preprocess.remove_nontargets.remove_colorchecker
 
-        self.image_list_path = Path(cfg.paths.project_mode_dir) / "data" / "images.txt"
+        self.image_list_path = Path(cfg.paths.project_preprocess_dir) / "data" / "images.txt"
         self.image_list = [Path(x) for x in self._get_images_paths()]
 
-        self.mask_output_dir = Path(cfg.paths.project_mode_dir) / "data" / "masks"
+        self.mask_output_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "masks"
         self.mask_output_dir.mkdir(parents=True, exist_ok=True)
+
+        self.use_synthetic = cfg.preprocess.use_synthetic.enable
+        self.use_all_synthetic_subprojects = cfg.preprocess.use_synthetic.use_all_subprojects
+        self.synthetic_project_dir = Path(cfg.paths.synthetic_project_dir)
+        self.synthetic_subproject_dir = Path(self.synthetic_project_dir, cfg.preprocess.use_synthetic.sub_project) if cfg.preprocess.use_synthetic.sub_project is not None else None
+
         
     def _get_images_paths(self) -> list:
         """
@@ -106,13 +113,36 @@ class NonTargetRemover:
             for mask_file in mask_files:
                 self.process_file(mask_file)
 
+    def copy_synthetic_masks(self):
+        """
+        Copy synthetic masks from the synthetic project directory to the output directory.
+        """
+        if self.use_all_synthetic_subprojects:
+            synthetic_masks = sorted(self.synthetic_project_dir.glob("**/results/semantic_masks/*.png"))
+        else:
+            synthetic_masks = sorted(self.synthetic_subproject_dir.glob("results/semantic_masks/*.png"))
+
+        for mask in synthetic_masks:
+            output_mask_path = self.mask_output_dir / mask.name
+            if not output_mask_path.exists():
+                shutil.copy(mask, output_mask_path)
+                log.info(f"Copied synthetic mask {mask} to {output_mask_path}")
+            else:
+                log.warning(f"Mask {output_mask_path} already exists. Skipping copy.")
+
 
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     log.info("Removing non_target weeds.")
     processor = NonTargetRemover(cfg)
-    processor.process_all()
-    log.info("Non-target removal completed.")
+    
+    if not processor.use_synthetic:
+        processor.process_all()
+        log.info("Non-target removal completed.")
+    else:
+        # Implement synthetic data processing if needed
+        processor.copy_synthetic_masks()
+        log.info("Synthetic data processing completed.")
 
 if __name__ == "__main__":
     main()

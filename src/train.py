@@ -22,6 +22,7 @@ def set_seed(seed=2**3):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True, warn_only=False)
 
 def load_stats(stats_file: Path):
         # stats_file = self.project_dir / "preprocess/data/data_stats/rgb_mean_std.json"

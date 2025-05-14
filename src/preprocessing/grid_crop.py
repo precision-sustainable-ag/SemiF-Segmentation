@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 class CropProcessor:
     def __init__(self, cfg: DictConfig):
         
-        self.project_output_dir = Path(cfg.paths.project_mode_dir)
+        self.project_output_dir = Path(cfg.paths.project_preprocess_dir)
         self.local_masks_present, self.mask_folder = self._initialize_mask_folder()
         
         self.image_list_path = Path(cfg.paths.project_mode_dir) / "data" / "images.txt"
