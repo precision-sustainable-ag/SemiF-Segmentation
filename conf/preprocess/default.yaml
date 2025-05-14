@@ -1,8 +1,8 @@
 tasks:
-  find_images: true
-  remove_nontargets: true
-  grid_crop: true # successfully tested
-  remap_masks: true # successfully tested
+  find_images: false
+  remove_nontargets: false # If true, only moves synthetic masks if use_synthetic is true
+  grid_crop: false # successfully tested
+  remap_masks: false # successfully tested
   train_val_test_split: true # successfully tested
   
   data_stats: true # successfully tested
@@ -18,11 +18,11 @@ remove_nontargets:
   remove_colorchecker: True
 
 grid_crop:
-  crop_height: 1024
-  crop_width: 1024
+  crop_height: 2048
+  crop_width: 2048
 
 remap_masks:
-  group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
+  group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
   process_concurrently: False
 
 train_val_test_split:
