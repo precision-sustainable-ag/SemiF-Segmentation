@@ -48,16 +48,23 @@ jobs:
           echo "VERSION_DIR=$VERSION_DIR" >> $GITHUB_ENV
           echo "PROJECT_NAME=$PROJECT_NAME" >> $GITHUB_ENV
         
-      - name: Push metrics plot to training-artifacts branch
+      - name: Push metrics and prediction plot to training-artifacts branch
         run: |
           IMAGE_NAME="metrics_${GITHUB_RUN_ID}.png"
+          PRED_NAME="predictions_${GITHUB_RUN_ID}.png"
           IMAGE_PATH="assets/$IMAGE_NAME"
+          PRED_PATH="assets/$PRED_NAME"
 
           mkdir -p assets
           if [ -f "$VERSION_DIR/metrics.png" ]; then
             cp "$VERSION_DIR/metrics.png" "$IMAGE_PATH"
           else
             echo "⚠️ WARNING: $VERSION_DIR/metrics.png not found. Skipping copy."
+          fi
+          if [ -f "$VERSION_DIR/sample_predictions/test_prediction.png" ]; then
+            cp "$VERSION_DIR/sample_predictions/predictions.png" "$PRED_PATH"
+          else
+            echo "⚠️ WARNING: $VERSION_DIR/sample_predictions/predictions.png not found. Skipping copy."
           fi
 
           # Setup Git identity
@@ -87,10 +94,12 @@ jobs:
           # Copy image and commit
           mkdir -p artifacts_worktree/assets
           cp "$IMAGE_PATH" artifacts_worktree/assets/
+          cp "$PRED_PATH" artifacts_worktree/assets/
 
           cd artifacts_worktree
           git add "assets/$IMAGE_NAME"
-          git commit -m "Add metrics plot for run $GITHUB_RUN_ID"
+          git add "assets/$PRED_NAME"
+          git commit -m "Add metrics and predictions for run $GITHUB_RUN_ID"
           git push origin HEAD:refs/heads/training-artifacts
           cd ..
 

@@ -63,15 +63,16 @@ train:
             
     perspective:
       enable: true
-      p: 0.5
-      scale: [0.1, 0.3]
+      p: 1.0
+      # scale: [0.1, 0.3]
+      scale: [0.25, 0.5]
       fit_output: false
       
   photometrics_transforms:
     enable: true
     some_of:
       p: 1.0
-      n: 2
+      n: 1
       replace: false
     
     rgb_shift:
@@ -100,7 +101,7 @@ train:
     
     color_jitter:
       enable: true
-      p: 0.5
+      p: 0.25
     
     huesatval:
       enable: false  # DISABLED (too strong for natural images)

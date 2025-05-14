@@ -1,8 +1,12 @@
 import matplotlib.pyplot as plt
-from pathlib import Path
-import pandas as pd
 from matplotlib.ticker import MaxNLocator
 import numpy as np
+import pandas as pd
+from pathlib import Path
+import torch
+import cv2
+
+
 def plot_train_val_metrics(metrics_file, metrics=["train_loss", "valid_loss", "train_dataset_iou", "valid_dataset_iou"], output_file=None):
     """
     Plots training and validation metrics (e.g., loss, IoU) from a metrics CSV file after each epoch.
@@ -183,3 +187,44 @@ def visualize_predictions(images, masks, pr_masks, output_dir="output", num_samp
             plt.savefig(Path(output_dir, f"output_{idx}.png"))
         else:
             break
+
+def side_by_side_plot(image_tensor, mask_gt, mask_pred, output_path: Path, class_colors=None, class_labels=None):
+    """
+    Plot Image | Ground Truth | Prediction side by side and save.
+    """
+    # Convert image tensor to numpy
+    if isinstance(image_tensor, torch.Tensor):
+        image = image_tensor.permute(1, 2, 0).cpu().numpy()
+    else:
+        image = image_tensor
+
+    # If normalized (0-1), scale to 0-255
+    if image.max() <= 1.0:
+        image = (image * 255).astype(np.uint8)
+    else:
+        image = image.astype(np.uint8)
+
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+
+    axs[0].imshow(image)
+    axs[0].set_title('Image')
+    axs[0].axis('off')
+
+    axs[1].imshow(mask_gt, cmap='jet', interpolation='nearest')
+    axs[1].set_title('Ground Truth')
+    axs[1].axis('off')
+
+    axs[2].imshow(mask_pred, cmap='jet', interpolation='nearest')
+    axs[2].set_title('Prediction')
+    axs[2].axis('off')
+
+    plt.tight_layout()
+
+    # Optional: Add legend if provided
+    if class_colors and class_labels:
+        handles = [plt.Line2D([0], [0], marker='s', color='w', markerfacecolor=np.array(color)/255, markersize=10)
+                   for color in class_colors.values()]
+        axs[2].legend(handles, class_labels.values(), bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.savefig(output_path)
+    plt.close()
