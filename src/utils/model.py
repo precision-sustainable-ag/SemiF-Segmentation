@@ -12,6 +12,69 @@ from matplotlib.ticker import MaxNLocator
 
 log = logging.getLogger(__name__)
 
+
+def deterministic_get_stats(pred: torch.Tensor, target: torch.Tensor, mode: str, num_classes: int = 1, ignore_index: int = None):
+    """
+    Deterministic replacement for smp.metrics.get_stats using torch.bincount instead of torch.histc.
+    Returns correct shape (batch_size, num_classes) for compatibility with iou_score.
+    """
+    batch_size = pred.shape[0]
+
+    if mode == "binary":
+        pred = pred.view(batch_size, -1)
+        target = target.view(batch_size, -1)
+
+        if ignore_index is not None:
+            mask = target != ignore_index
+        else:
+            mask = torch.ones_like(target, dtype=torch.bool)
+
+        tp = ((pred == 1) & (target == 1) & mask).sum(dim=1, keepdim=True)
+        fp = ((pred == 1) & (target == 0) & mask).sum(dim=1, keepdim=True)
+        fn = ((pred == 0) & (target == 1) & mask).sum(dim=1, keepdim=True)
+        tn = ((pred == 0) & (target == 0) & mask).sum(dim=1, keepdim=True)
+
+    elif mode == "multiclass":
+        tp = []
+        fp = []
+        fn = []
+        tn = []  # TN stays zero-filled in multiclass for IoU
+
+        for i in range(batch_size):
+            pred_i = pred[i].view(-1)
+            target_i = target[i].view(-1)
+
+            if ignore_index is not None:
+                mask = target_i != ignore_index
+                pred_i = pred_i[mask]
+                target_i = target_i[mask]
+
+            matched = pred_i[target_i == pred_i]
+            tp_i = torch.bincount(matched, minlength=num_classes)
+
+            fp_i = torch.bincount(pred_i[target_i != pred_i], minlength=num_classes)
+            fn_i = torch.bincount(target_i[target_i != pred_i], minlength=num_classes)
+
+            tn_i = torch.zeros_like(tp_i)  # TN is often unused for multiclass IoU
+
+            tp.append(tp_i)
+            fp.append(fp_i)
+            fn.append(fn_i)
+            tn.append(tn_i)
+
+        tp = torch.stack(tp, dim=0)  # Shape: (batch_size, num_classes)
+        fp = torch.stack(fp, dim=0)
+        fn = torch.stack(fn, dim=0)
+        tn = torch.stack(tn, dim=0)
+
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+
+    return tp, fp, fn, tn
+
+# Monkey patch SMP metrics
+smp.metrics.get_stats = deterministic_get_stats
+
 class FastBoundaryLoss(torch.nn.Module):
     def __init__(self, dilation_ratio=0.02):
         super().__init__()
@@ -163,7 +226,13 @@ class SegmentationModule(pl.LightningModule):
                 return smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True, ignore_index=self.ignore_index)
             
         elif self.mode == "multiclass":
-            return smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
+            if self.loss_strategy == "DiceCrossEntropy":
+                dice = smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
+                ce = torch.nn.CrossEntropyLoss(ignore_index=self.ignore_index)
+                return lambda logits, targets: 0.5 * dice(logits, targets) + 0.5 * ce(logits, targets)
+            else:
+                return smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
+            
         else:
             raise ValueError("Invalid mode. Choose 'binary' or 'multiclass'.")
         
@@ -198,6 +267,9 @@ class SegmentationModule(pl.LightningModule):
         images, masks, _ = batch
         masks = masks.long()
         
+        if self.mode == "multiclass" and masks.ndim == 4 and masks.shape[1] == 1:
+            masks = masks.squeeze(1)  # (B, H, W)
+        
         # Forward pass
         logits = self.forward(images)
         # Compute the loss
@@ -206,7 +278,7 @@ class SegmentationModule(pl.LightningModule):
         if self.mode == "binary":
             prob_masks = torch.sigmoid(logits)
             pred_masks = (prob_masks > self.threshold).long()
-        else:
+        elif self.mode == "multiclass":
             prob_masks = torch.softmax(logits, dim=1)
             pred_masks = prob_masks.argmax(keepdim=True, dim=1)
 
@@ -228,8 +300,10 @@ class SegmentationModule(pl.LightningModule):
             background_iou = class_iou[0]
             self.log(f"{stage}_background_iou", background_iou, on_epoch=True, prog_bar=False)
             self.log(f"{stage}_object_iou", object_iou, on_epoch=True, prog_bar=True)
-        
+
         elif self.mode == "multiclass":
+            # Compute per-class IoU for multiclass
+            class_iou = self.compute_classwise_iou(tp, fp, fn, tn)
             for idx, iou in enumerate(class_iou):
                 self.log(f"{stage}_class_{idx}_iou", iou.item(), on_epoch=True, prog_bar=False)
 
@@ -273,130 +347,86 @@ class SegmentationModule(pl.LightningModule):
 
     def compute_classwise_iou(self, tp: torch.Tensor, fp: torch.Tensor, fn: torch.Tensor, tn: torch.Tensor):
         """
-        Compute per-class IoU from aggregated true positives, false positives, false negatives, and true negatives.
+        Compute per-class IoU from aggregated tp, fp, fn.
 
         Args:
-            tp (torch.Tensor): True positives, shape (N, C) or (C,) after aggregation
-            fp (torch.Tensor): False positives, shape (N, C) or (C,)
-            fn (torch.Tensor): False negatives, shape (N, C) or (C,)
-            tn (torch.Tensor): True negatives, shape (N, C) or (C,)
+            tp (torch.Tensor): Shape (N, C)
+            fp (torch.Tensor): Shape (N, C)
+            fn (torch.Tensor): Shape (N, C)
+            tn (torch.Tensor): Shape (N, C)
 
         Returns:
-            torch.Tensor: IoU score for each class, shape (C,)
+            torch.Tensor: Class-wise IoU, shape (C,)
         """
-        # If batch dimension exists, sum across batch
-        # if tp.ndim == 2:
         tp_total = tp.sum(dim=0)
         fp_total = fp.sum(dim=0)
         fn_total = fn.sum(dim=0)
-        tn_total = tn.sum(dim=0)
-        object_iou = tp_total / (tp_total + fp_total + fn_total + 1e-7)
-        background_tp = tn_total
-        background_fp = fn_total
-        background_fn = fp_total
-        background_iou = background_tp / (background_tp + background_fp + background_fn + 1e-7)
 
-        return background_iou, object_iou
-    
+        class_iou = tp_total / (tp_total + fp_total + fn_total + 1e-7)
+
+        return class_iou
+
     def plot_train_val_metrics(self):
         """
-        Plots training and validation metrics (e.g., loss, IoU) from a metrics CSV file after each epoch.
-        Loss and IoU are separated into subplots.
-        
-        Args:
-            metrics_file (str): Path to the metrics CSV file.
-            metrics (list): List of metric column names to plot (e.g., ["train_loss", "valid_loss"]).
-            output_file (str, optional): If specified, saves the plot to this file. Default is None.
-        
-        Returns:
-            None: Displays the plot (and optionally saves it to a file).
+        Plots training and validation metrics (e.g., loss, IoU) from metrics CSV file.
+        Handles binary and multiclass metrics dynamically.
         """
-        # Load the metrics CSV into a pandas DataFrame
         metrics_file = Path(self.logger.log_dir, "metrics.csv")
         if not metrics_file.exists():
             log.warning("No metrics file found.")
             return
-        
-        metrics_df = pd.read_csv(metrics_file)
 
-        metrics = list(metrics_df.columns)
-        
+        metrics_df = pd.read_csv(metrics_file)
         if metrics_df.empty:
             log.warning("No metrics to plot.")
             return
-        
 
-        # Initialize the subplots
+        metrics = list(metrics_df.columns)
+
         fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
-        # Plot the loss metrics
+        # === Plot Loss Metrics ===
         for metric in metrics:
             if "loss" in metric:
+                df = metrics_df.dropna(subset=[metric])
                 if "train" in metric:
-                    train_df = metrics_df.dropna(subset=[metric])
-                    axs[0].plot(
-                        train_df["epoch"], train_df[metric],
-                        label=f"Training {metric.split('_')[-1].capitalize()}",
-                        marker="o", color="#1f77b4"
-                    )
+                    axs[0].plot(df["epoch"], df[metric], label=f"Train {metric.split('_')[-1]}", marker="o")
                 elif "valid" in metric:
-                    val_df = metrics_df.dropna(subset=[metric])
-                    axs[0].plot(
-                        val_df["epoch"], val_df[metric],
-                        label=f"Validation {metric.split('_')[-1].capitalize()}",
-                        marker="s", color="#ffa500"
-                    )
+                    axs[0].plot(df["epoch"], df[metric], label=f"Valid {metric.split('_')[-1]}", marker="s")
 
         axs[0].set_title("Loss")
         axs[0].set_ylabel("Loss")
         axs[0].legend(loc="upper right")
         axs[0].grid(True)
-        # Define colors for training (dark) and validation (light) metrics
-        
-        colors = {
-            "train_dataset_iou": "#2ca02c",
-            "train_per_image_iou": "#1f77b4",
-            "train_background_iou": "#ff7f0e",
-            "train_object_iou": "#d62728",
-            "valid_dataset_iou": "#98df8a",
-            "valid_per_image_iou": "#aec7e8",
-            "valid_background_iou": "#ffbb78",
-            "valid_object_iou": "#ff9896",
-        }
-        # Plot the IoU metrics
+
+        # === Plot IoU Metrics ===
+        # Predefine some common colors
+        base_colors = [
+            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+        ]
+
+        color_idx = 0
         for metric in metrics:
             if "iou" in metric:
+                df = metrics_df.dropna(subset=[metric])
                 if "train" in metric:
-                    train_df = metrics_df.dropna(subset=[metric])
-                    color = colors.get(metric, None)  # fallback to default color if not found
-                    axs[1].plot(
-                    train_df["epoch"], train_df[metric],
-                    label=f"Training {metric.replace('train_', '').replace('_', ' ').capitalize()}",
-                    marker="o", color=color
-                    )
+                    color = base_colors[color_idx % len(base_colors)]
+                    axs[1].plot(df["epoch"], df[metric], label=f"Train {metric.replace('train_', '').replace('_', ' ')}", marker="o", color=color)
+                    color_idx += 1
                 elif "valid" in metric:
-                    val_df = metrics_df.dropna(subset=[metric])
-                    color = colors.get(metric, None)  # fallback to default color if not found
-                    axs[1].plot(
-                    val_df["epoch"], val_df[metric],
-                    label=f"Validation {metric.replace('valid_', '').replace('_', ' ').capitalize()}",
-                    marker="s", color=color
-                    )
+                    color = base_colors[color_idx % len(base_colors)]
+                    axs[1].plot(df["epoch"], df[metric], label=f"Valid {metric.replace('valid_', '').replace('_', ' ')}", marker="s", color=color)
+                    color_idx += 1
 
         axs[1].set_title("IoU")
         axs[1].set_xlabel("Epoch")
         axs[1].set_ylabel("IoU")
-        axs[1].legend(loc="lower right")
+        axs[1].legend(loc="best", fontsize='small')
         axs[1].grid(True)
-
-        # Force integer x-axis ticks
         axs[1].xaxis.set_major_locator(MaxNLocator(integer=True))
 
-
-        # Adjust layout
         plt.tight_layout()
-
-        # Show or save the plot
         output_file = Path(self.logger.log_dir, "metrics.png")
         plt.savefig(output_file)
         print(f"Plot saved to {output_file}")
