@@ -5,7 +5,7 @@ seed: 42
 augment: default
 
 loss:
-  name: DiceFocalLoss # DiceFocalLoss, DiceBCELoss, DiceWithBoundaryLoss
+  name: DiceBCELoss # smpDiceLoss, DiceFocalLoss, DiceBCELoss, DiceWithBoundaryLoss
 
 lr:
   base_lr: 0.001
