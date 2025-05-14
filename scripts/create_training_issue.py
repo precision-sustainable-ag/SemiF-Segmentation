@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import requests
 import json
-import base64
 from pathlib import Path
 from datetime import datetime
 
@@ -32,12 +31,24 @@ def extract_metrics(csv_path):
     # Merge on epoch and step
     merged = pd.merge(
         train_df[[
-            "epoch", "step", "train_loss", "train_dataset_iou", "train_per_image_iou",
-            "train_background_iou", "train_object_iou"
+            "epoch", 
+            "step",
+            "train_loss",
+            "train_class_0_iou",
+            "train_class_1_iou",
+            "train_class_2_iou",
+            "train_dataset_iou",
+            "train_per_image_iou"
         ]],
         val_df[[
-            "epoch", "step", "valid_loss", "valid_dataset_iou", "valid_per_image_iou",
-            "valid_background_iou", "valid_object_iou"
+            "epoch", "step", 
+            "valid_loss",
+            "valid_class_0_iou",
+            "valid_class_1_iou",
+            "valid_class_2_iou",
+            "valid_dataset_iou",
+            "valid_per_image_iou"
+            
         ]],
         on=["epoch", "step"],
         how="outer"
@@ -87,12 +98,17 @@ def main():
     project_name = os.environ.get("PROJECT_NAME", "unknown_project")
     
     image_url = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/metrics_{run_id}.png"
+    prediction_url = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/predictions_{run_id}.png"
     image_md = f"![Training Plots]({image_url})"
+    prediction_md = f"![Sample Prediction]({prediction_url})"
 
     run_info_file = "logs/run_info.json"
     run_info_md = format_run_info(run_info_file)
     
     metrics_file = os.path.join(version_dir, "metrics.csv")
+    sample_predictions_dir = Path(version_dir) / "sample_predictions"
+    sample_predictions = list(sample_predictions_dir.glob("*.png"))
+
     _, _, markdown_table = extract_metrics(metrics_file)
     
 
@@ -119,6 +135,9 @@ def main():
 #### 📈 Training Plots
 
 {image_md}
+
+#### 📸 Sample Prediction
+{prediction_md}
 
 _Triggered by push to `develop` branch._
 """

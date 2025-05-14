@@ -6,6 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 import numpy as np
 import json
 import torch
+import logging
 from torch.utils.data import DataLoader
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger
@@ -15,8 +16,11 @@ from pytorch_lightning.utilities import rank_zero_only
 
 from src.utils.datasets import Dataset
 from src.utils.model import SegmentationModule
-from src.utils.viz_utils import viz_batch
+from src.utils.viz_utils import viz_batch, side_by_side_plot
 from src.utils.augs import train_aug, val_aug
+
+log = logging.getLogger(__name__)
+
 
 def set_seed(seed=2**3):
     torch.manual_seed(seed)
@@ -78,6 +82,8 @@ def main(cfg: DictConfig):
     train_mask_dir = split_data_dir / "train" / "masks"
     val_image_dir = split_data_dir / "val" / "images"
     val_mask_dir = split_data_dir / "val" / "masks"
+    test_image_dir = split_data_dir / "test" / "images"
+    test_mask_dir = split_data_dir / "test" / "masks"
 
     checkpoint_dir = Path(logger.log_dir, "checkpoints")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -113,6 +119,15 @@ def main(cfg: DictConfig):
         mean=mean,
         std=std,
     )
+
+    test_dataset = Dataset(
+        test_image_dir,
+        test_mask_dir,
+        augmentation=val_aug(cfg),
+        normalize_image=cfg.train.dataset.normalize,
+        mean=mean,
+        std=std,
+    )
     
     train_loader = DataLoader(
         train_dataset, 
@@ -129,6 +144,7 @@ def main(cfg: DictConfig):
         shuffle=False, 
         num_workers=cfg.train.dataset.workers
         )
+    
     
     sample_dataloader = DataLoader(
         train_dataset, 
@@ -181,6 +197,31 @@ def main(cfg: DictConfig):
     model_dir.mkdir(parents=True, exist_ok=True)
     print(f"Best model being saved to: {Path(model_dir, 'best_model')}.pth")
     best_model.save_model(model_dir, "best_model")
+
+    # === Sample Inference on 5 Validation Images === #
+    log.info("Running sample inference on validation images...")
+
+    best_model.eval()  # set model to eval mode
+
+    output_dir = Path(logger.log_dir) / "sample_predictions"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Randomly select 5 samples from val_dataset
+    
+    sample = test_dataset[0]
+    image = sample[0].unsqueeze(0).to(best_model.device)  # add batch dim
+    mask_gt = sample[1].cpu().numpy().squeeze()
+
+    with torch.no_grad():
+        output = best_model(image)
+        mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
+
+    # Save side-by-side plot
+    output_path = output_dir / f"test_prediction.png"
+
+    side_by_side_plot(sample[0], mask_gt, mask_pred, output_path)
+
+    log.info(f"Saved sample predictions to {output_dir}")
 
 if __name__ == "__main__":
     main()

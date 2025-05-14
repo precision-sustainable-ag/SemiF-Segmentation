@@ -1,5 +1,5 @@
 tasks:
-  get_dataset: true
+  get_dataset: false
   inference: true
 
 get_dataset:
@@ -16,13 +16,12 @@ inference:
     img_dir: data/rye_vetch/biomass-data/images
   bbox_crop: false # Not compatible with synthetic data
   inference_subname: test_set
-  version: 4 # Uses cfg.project.name to find the model
+  version: 2 # Uses cfg.project.name to find the model
   rescale_factor: 1.0
   threshold: 0.5
   use_normalization: true
   cuda_visible_devices: [9]
   seed: 422
-  bbox_crop: true
 
   plot:
     overlays: false
