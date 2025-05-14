@@ -140,7 +140,6 @@ def main(cfg: DictConfig):
         processor.process_all()
         log.info("Non-target removal completed.")
     else:
-        log.info("Synthetic data processing is not implemented yet.")
         # Implement synthetic data processing if needed
         processor.copy_synthetic_masks()
         log.info("Synthetic data processing completed.")

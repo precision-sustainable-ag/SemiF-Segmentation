@@ -171,7 +171,7 @@ class Visualizer:
         else:
             image = cv2.imread(str(image_path))
             if image is None:
-                print(f"Warning: Failed to load {image_path}")
+                log.warning(f"Failed to load {image_path}")
                 return
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             if image.shape[:2] != mask.shape:
