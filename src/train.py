@@ -43,16 +43,13 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
     """
     valid_per_image_iou = val_result[0]["valid_per_image_iou"]
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
-    valid_background_iou = val_result[0]["valid_background_iou"]
-    valid_object_iou = val_result[0]["valid_object_iou"]
+
     run_info = {
         "version_dir": str(logger.log_dir),
         "project_name": cfg.project.name,
         "timestamp": datetime.now().isoformat(),
         "valid_dataset_iou": valid_dataset_iou,
         "valid_per_image_iou": valid_per_image_iou,
-        "valid_background_iou": valid_background_iou,
-        "valid_object_iou": valid_object_iou,
         "num_epochs": cfg.train.epochs,
         "batch_size": cfg.train.batch_size,
         }
