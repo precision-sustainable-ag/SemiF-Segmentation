@@ -141,15 +141,17 @@ class Visualizer:
         self.plot_cfg = plot_cfg
         self.plot_comparisons = plot_cfg.comparisons
         self.plot_overlays = plot_cfg.overlays
+        self.plot_image_mask = plot_cfg.image_and_mask
         self._setup_dirs()
-        self.color_mapping = {
-            0: [0, 0, 0],
-            1: [255, 182, 193],
-            2: [173, 216, 230],
-            3: [152, 251, 152],
-            4: [255, 160, 122],
-            5: [238, 130, 238],
-            255: [152, 251, 152]
+
+        self.class_colors = {
+            0: ("Background/Soil", [0, 0, 0]),
+            1: ("Grass", [255, 182, 193]),
+            2: ("Hairy vetch", [173, 216, 230]),
+            3: ("Soil", [152, 251, 152]),
+            4: ("Residue", [255, 160, 122]),
+            5: ("Shadow", [238, 130, 238]),
+            # Add more if needed...
         }
 
     def _setup_dirs(self):
@@ -157,6 +159,60 @@ class Visualizer:
         self.plots_dst.mkdir(parents=True, exist_ok=True) if self.plot_comparisons else None
         self.overlays_dst = self.output_dir / "overlays"
         self.overlays_dst.mkdir(parents=True, exist_ok=True) if self.plot_overlays else None
+        self.image_and_mask_dst = self.output_dir / "sidebyside"
+        self.image_and_mask_dst.mkdir(parents=True, exist_ok=True) if self.plot_image_mask else None
+
+    def draw_image_and_mask(self, image_path: Path, mask: np.ndarray, out_classes: int, bbox_idx: int = None, crop_image=None):
+        """
+        Draw and save side-by-side RGB image and colorized mask with legend, using self.class_colors dict.
+        """
+        if crop_image is not None:
+            image = crop_image
+        else:
+            image = cv2.imread(str(image_path))
+            if image is None:
+                print(f"Warning: Failed to load {image_path}")
+                return
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            if image.shape[:2] != mask.shape:
+                image = cv2.resize(image, (mask.shape[1], mask.shape[0]), interpolation=cv2.INTER_LINEAR)
+
+        # === Build color mask ===
+        color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+        for cls_idx, (cls_name, cls_color) in self.class_colors.items():
+            if cls_idx >= out_classes:
+                continue
+            color_mask[mask == cls_idx] = cls_color
+
+        # === Plot side-by-side ===
+        fig, axs = plt.subplots(1, 2, figsize=(2 * image.shape[1] / self.dpi, image.shape[0] / self.dpi), dpi=self.dpi)
+
+        axs[0].imshow(image)
+        axs[0].set_title("Original Image")
+        axs[0].axis('off')
+
+        axs[1].imshow(color_mask)
+        axs[1].set_title("Predicted Mask")
+        axs[1].axis('off')
+
+        # === Add Legend ===
+        from matplotlib.patches import Patch
+        legend_elements = []
+        for cls_idx, (cls_name, cls_color) in self.class_colors.items():
+            if cls_idx >= out_classes:
+                continue
+            legend_elements.append(Patch(facecolor=np.array(cls_color) / 255.0, edgecolor='black', label=cls_name))
+
+        axs[1].legend(handles=legend_elements, loc='lower right', fontsize='small', frameon=True, bbox_to_anchor=(1.05, 0))
+
+        # Save plot
+        suffix = f"_bbox{bbox_idx}" if bbox_idx is not None else ""
+        out_path = self.image_and_mask_dst / f"{image_path.stem}{suffix}_sidebyside.png"
+
+        plt.tight_layout()
+        plt.savefig(out_path, bbox_inches='tight', pad_inches=0, transparent=self.transparent)
+        plt.close(fig)
+
 
     def draw_overlay(self, image_path: Path, mask, out_classes: int, bbox_idx: int = None, crop_image=None):
         """
@@ -227,33 +283,48 @@ class Visualizer:
 
         # Save comparison
         suffix = f"_bbox{bbox_idx}" if bbox_idx is not None else ""
-        out_path = self.plots_dst / f"{image_path.stem}{suffix}_comparison.png"
+        out_path = self.plots_dst / f"{image_path.stem}{suffix}_image_and_mask.png"
         
         plt.savefig(out_path, bbox_inches='tight', pad_inches=0, transparent=self.transparent)
         plt.close(fig)
 
     def _apply_mask_overlay(self, image, mask, out_classes):
-        """
-        Apply the mask overlay onto the image and return the overlayed image.
-        """
         overlay_img = image.copy()
+
         if image.shape[:2] != mask.shape:
             raise ValueError(f"Image shape {image.shape[:2]} does not match mask shape {mask.shape}")
 
+        # === Fixed colors per class ===
+        colors = np.array([
+            [0, 0, 0],        # Background (class 0)
+            [255, 182, 193],  # Class 1
+            [173, 216, 230],  # Class 2
+            [152, 251, 152],  # Class 3
+            [255, 160, 122],  # Class 4
+            [238, 130, 238],  # Class 5
+        ], dtype=np.uint8)
 
-        if out_classes == 1:
-            green_overlay = np.zeros_like(image)
-            green_overlay[:, :, 1] = 255  # Green mask
-            mask_bool = mask.astype(bool)
-            if mask_bool.any():  # <-- Skip empty masks
-                overlay_img[mask_bool] = cv2.addWeighted(image[mask_bool], 0.7, green_overlay[mask_bool], 0.3, 0)
-            
-        else:
-            colors = np.random.randint(0, 255, (out_classes, 3), dtype=np.uint8)
-            for cls in range(1, out_classes):  # skip background
-                mask_bool = (mask == cls)
-                if mask_bool.any():  # <-- Skip empty masks
-                    overlay_img[mask_bool] = cv2.addWeighted(image[mask_bool], 0.7, colors[cls], 0.4, 0)
+        if out_classes >= colors.shape[0]:
+            extra_colors = np.random.randint(0, 255, (out_classes - colors.shape[0] + 1, 3), dtype=np.uint8)
+            colors = np.vstack([colors, extra_colors])
+
+        # === Build full overlay image ===
+        overlay = np.zeros_like(image, dtype=np.uint8)
+
+        for cls in range(1, out_classes):  # Skip background 0
+            mask_bool = (mask == cls)
+            if mask_bool.any():
+                overlay[mask_bool] = colors[cls]
+
+        # === Blend overlay with image ===
+        alpha = 0.4  # Increase alpha to 0.5 - 0.6 for stronger mask colors.
+        overlay_img = cv2.addWeighted(overlay, alpha, overlay_img, 1 - alpha, 0)
+
+        # === Optionally draw contours around each class ===
+        for cls in range(1, out_classes):
+            mask_bool = (mask == cls).astype(np.uint8)
+            contours, _ = cv2.findContours(mask_bool, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(overlay_img, contours, -1, (255, 255, 255), thickness=1)  # white contour line
 
         return overlay_img
 
@@ -321,6 +392,7 @@ class InferenceRunner:
                     cv2.imwrite(str(mask_path), mask * 255 if self.out_classes == 1 else mask)
                     visualizer.draw_overlay(path, mask, self.out_classes, bbox_idx=idx, crop_image=crop_img)
                     visualizer.draw_comparison(path, mask, self.out_classes, bbox_idx=idx, crop_image=crop_img)
+                    visualizer.draw_image_and_mask(path, mask, self.out_classes, bbox_idx=idx, crop_image=crop_img)
 
             else:
                 # Single full image
@@ -329,6 +401,7 @@ class InferenceRunner:
                 cv2.imwrite(str(mask_path), mask * 255 if self.out_classes == 1 else mask)
                 visualizer.draw_overlay(path, mask, self.out_classes)
                 visualizer.draw_comparison(path, mask, self.out_classes)
+                visualizer.draw_image_and_mask(path, mask, self.out_classes)
         
             crop_shapes = [crop.shape for crop in crops] if self.bbox_crop else None
             stats.append({
