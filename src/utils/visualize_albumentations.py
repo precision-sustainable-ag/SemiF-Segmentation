@@ -78,10 +78,10 @@ def build_noise_transforms(cfg):
     noise_map = {
         "MultiplicativeNoise": A.MultiplicativeNoise,
         "ISONoise": A.ISONoise,
-        "JpegCompression": A.JpegCompression,
+        "ImageCompression": A.ImageCompression,
     }
 
-    return build_transforms(noise_cfg.transforms, noise_map)
+    return build_transforms(noise_cfg, noise_map)
 
 def apply_and_plot(image_path, output_dir, transforms):
     image = cv2.imread(str(image_path))
@@ -113,10 +113,14 @@ def batch_process(input_folder, output_folder, cfg):
     image_paths = sorted(load_images_from_folder(input_folder))
     output_dir = Path(output_folder)
     
+    
     transforms = [("Original", A.NoOp())]  # Add once, globally
-    transforms += build_photometric_transforms(cfg)
-    transforms += build_geometric_transforms(cfg)
-    transforms += build_noise_transforms(cfg)
+    if cfg.train.photometrics_transforms.enable:
+        transforms += build_photometric_transforms(cfg)
+    if cfg.train.geometrics_transforms.enable:
+        transforms += build_geometric_transforms(cfg)
+    if cfg.train.noise_transforms.enable:
+        transforms += build_noise_transforms(cfg)
 
     for img_path in image_paths:
         print(f"Processing {img_path.name}...")

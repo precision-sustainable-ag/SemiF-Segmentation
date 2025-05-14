@@ -1,6 +1,6 @@
 train:
-  # img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
-  img_hw: [512, 512]
+  img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
+  # img_hw: [512, 512]
 
   geometrics_transforms:
     enable: true
@@ -128,29 +128,28 @@ train:
       p: 1.0
       
   noise_transforms:
-    enable: false
+    enable: true
     some_of:
       p: 1.0
       n: 2
       replace: false
-    
-    transforms:
-      MultiplicativeNoise:
-        multiplier: [0.9, 1.1]
-        per_channel: true
-        p: 0.15
 
-      ISONoise:
-        color_shift_min: 0.01
-        color_shift_max: 0.1
-        intensity_min: 0.1
-        intensity_max: 0.5
-        p: 0.15
-      
-      JpegCompression:
-        quality_lower: 10
-        quality_upper: 70
-        p: 0.15
+    MultiplicativeNoise:
+      enable: true
+      p: 1.0
+      multiplier: [0.9, 1.1]
+      per_channel: true
+
+    ISONoise:
+      enable: true
+      p: 1.0
+      color_shift: [0.01, 0.1]
+      intensity: [0.1, .5]
+          
+    ImageCompression:
+      enable: true
+      p: 1.0
+      quality_range: [10,70]
 
 val:
   img_hw: ${augment.train.img_hw}

@@ -29,8 +29,8 @@ train:
     padding:
       enable: false
       p: 1.0
-      min_height: 8000
-      min_width: 8000
+      min_height: ${augment.train.img_hw[0]}
+      min_width: ${augment.train.img_hw[0]}
       position: "center"
     
     crop_and_pad:
@@ -133,25 +133,24 @@ train:
       p: 1.0
       n: 1
       replace: false
-    
-    transforms:
-      MultiplicativeNoise:
-        multiplier: [0.95, 1.05]
-        per_channel: true
-        p: 0.2
       
-      ISONoise:
-        color_shift_min: 0.01
-        color_shift_max: 0.05
-        intensity_min: 0.05
-        intensity_max: 0.2
-        p: 0.2
+    MultiplicativeNoise:
+      enable: true
+      p: 0.2
+      multiplier: [0.95, 1.05]
+      per_channel: true
+         
+    ISONoise:
+      enable: true
+      p: 0.2
+      color_shift: [0.01, 0.05]
+      intensity: [0.05, 0.2]
+          
+    ImageCompression:
+      enable: true
+      p: 0.3
+      quality_range: [50,90]
       
-      JpegCompression:
-        quality_lower: 50
-        quality_upper: 90
-        p: 0.3
-
 val:
   img_hw: ${augment.train.img_hw}
   padding:

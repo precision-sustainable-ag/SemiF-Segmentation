@@ -74,10 +74,10 @@ def get_noise_transforms(cfg) -> List[A.BasicTransform]:
     noise_map = {
         "MultiplicativeNoise": A.MultiplicativeNoise,
         "ISONoise": A.ISONoise,
-        "JpegCompression": A.JpegCompression,
+        "ImageCompression": A.ImageCompression,
     }
 
-    return build_transforms_from_config(n_cfg.transforms, noise_map)
+    return build_transforms_from_config(n_cfg, noise_map)
 
 def some_of_transforms(transforms: List[A.BasicTransform], some_cfg) -> A.SomeOf:
     if not transforms:

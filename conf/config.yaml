@@ -2,7 +2,7 @@ defaults:
   - paths: default           # Default paths config
   - query: default           # Default query config
   - preprocess: default          # Default training config
-  - augment: color_invariant  # Default augmentations config
+  - augment: default  # Default augmentations config
   - model: deeplabv3plus         # Model config
   - train: default         # Train config
   - inference: default      # Inference config
