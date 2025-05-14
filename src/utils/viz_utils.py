@@ -188,21 +188,11 @@ def visualize_predictions(images, masks, pr_masks, output_dir="output", num_samp
         else:
             break
 
-def side_by_side_plot(image_tensor, mask_gt, mask_pred, output_path: Path, class_colors=None, class_labels=None):
+def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_colors=None, class_labels=None):
     """
     Plot Image | Ground Truth | Prediction side by side and save.
     """
-    # Convert image tensor to numpy
-    if isinstance(image_tensor, torch.Tensor):
-        image = image_tensor.permute(1, 2, 0).cpu().numpy()
-    else:
-        image = image_tensor
-
-    # If normalized (0-1), scale to 0-255
-    if image.max() <= 1.0:
-        image = (image * 255).astype(np.uint8)
-    else:
-        image = image.astype(np.uint8)
+    image = cv2.imread(str(img_path))
 
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 

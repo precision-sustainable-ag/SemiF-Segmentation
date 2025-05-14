@@ -62,9 +62,9 @@ jobs:
             echo "⚠️ WARNING: $VERSION_DIR/metrics.png not found. Skipping copy."
           fi
           if [ -f "$VERSION_DIR/sample_predictions/test_prediction.png" ]; then
-            cp "$VERSION_DIR/sample_predictions/predictions.png" "$PRED_PATH"
+            cp "$VERSION_DIR/sample_predictions/test_prediction.png" "$PRED_PATH"
           else
-            echo "⚠️ WARNING: $VERSION_DIR/sample_predictions/predictions.png not found. Skipping copy."
+            echo "⚠️ WARNING: $VERSION_DIR/sample_predictions/test_prediction.png not found. Skipping copy."
           fi
 
           # Setup Git identity

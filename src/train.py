@@ -208,6 +208,9 @@ def main(cfg: DictConfig):
     sample = test_dataset[0]
     image = sample[0].unsqueeze(0).to(best_model.device)  # add batch dim
     mask_gt = sample[1].cpu().numpy().squeeze()
+    mask_stem = sample[2]
+    img_path = test_image_dir / f"{mask_stem}.jpg"
+    print(img_path)
 
     with torch.no_grad():
         output = best_model(image)
@@ -216,7 +219,7 @@ def main(cfg: DictConfig):
     # Save side-by-side plot
     output_path = output_dir / f"test_prediction.png"
 
-    side_by_side_plot(sample[0], mask_gt, mask_pred, output_path)
+    side_by_side_plot(img_path, mask_gt, mask_pred, output_path)
 
     log.info(f"Saved sample predictions to {output_dir}")
 
