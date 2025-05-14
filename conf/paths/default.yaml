@@ -58,3 +58,6 @@ semif_utils_dir: ${paths.data_dir}/semifield-utils
 species_info_dir: ${paths.semif_utils_dir}/species_information
 species_info_file: ${paths.species_info_dir}/species_info.json
 lts_species_info: ${paths.tertiary_storage}/semifield-utils/species_information/species_info.json
+
+# Synthetic data directory
+synthetic_project_dir: /home/mkutuga/SemiF-SyntheticPipeline/projects/${preprocess.use_synthetic.project_name}

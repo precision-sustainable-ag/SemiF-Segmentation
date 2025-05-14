@@ -11,6 +11,10 @@ get_dataset:
   masks: false
 
 inference:
+  explicit_img_dir:
+    enable: true
+    img_dir: data/rye_vetch/biomass-data/images
+  bbox_crop: false # Not compatible with synthetic data
   inference_subname: test_set
   version: 4 # Uses cfg.project.name to find the model
   rescale_factor: 1.0

@@ -262,7 +262,9 @@ class InferenceRunner:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
         self.model_ckpt = Path(cfg.paths.inference.checkpoints) / "best.ckpt"
-        self.image_dir = Path(cfg.paths.project_inference_dir) / "data" / "images"
+        self.image_dir = (Path(cfg.inference.inference.explicit_img_dir.img_dir) 
+                  if cfg.inference.inference.explicit_img_dir.enable 
+                  else Path(cfg.paths.project_inference_dir) / "data" / "images")
         self.metadata_dir = Path(cfg.paths.project_inference_dir) / "data" / "metadata"
         self.output_dir = Path(cfg.paths.inference_output_dir) / "results"
         self.project_preprocess_dir = Path(cfg.paths.project_preprocess_dir)
