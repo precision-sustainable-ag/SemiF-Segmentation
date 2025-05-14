@@ -30,7 +30,7 @@ train:
       enable: false
       p: 1.0
       min_height: ${augment.train.img_hw[0]}
-      min_width: ${augment.train.img_hw[0]}
+      min_width: ${augment.train.img_hw[1]}
       position: "center"
     
     crop_and_pad:

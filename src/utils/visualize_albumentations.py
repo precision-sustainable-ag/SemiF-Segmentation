@@ -125,7 +125,6 @@ def batch_process(input_folder, output_folder, cfg):
     for img_path in image_paths:
         print(f"Processing {img_path.name}...")
         apply_and_plot(img_path, output_dir, transforms)
-        exit()
 
 if __name__ == "__main__":
     # === Usage ===
