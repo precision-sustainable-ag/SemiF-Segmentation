@@ -219,14 +219,28 @@ def pad_to_multiple(image: torch.Tensor, multiple: int = 16) -> torch.Tensor:
     image_np = np.transpose(image_np, (2, 0, 1))  # Back to CHW
     return torch.from_numpy(image_np).to(image.device).float()
 
+def colorize_mask(mask: np.ndarray, color_dict: dict) -> np.ndarray:
+        """Convert mask (H, W) to color image (H, W, 3) using color_dict"""
+        color_mask = np.zeros((*mask.shape, 3), dtype=np.uint8)
+        for class_id, color in color_dict.items():
+            color_mask[mask == class_id] = color
+        return color_mask
+
 def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_colors=None, class_labels=None):
     """
     Plot Image | Ground Truth | Prediction side by side and save.
     """
     image = cv2.imread(str(img_path))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
+    
+    
 
+    # Colorize masks if class_colors provided
     if mask_gt is not None:
+        if class_colors:
+            mask_pred = colorize_mask(mask_pred, class_colors)
+            mask_gt = colorize_mask(mask_gt, class_colors) if mask_gt is not None else None
+        
         fig, axs = plt.subplots(1, 3, figsize=(15, 5))
         axs[0].imshow(image)
         axs[0].set_title(f'{img_path.stem}')
@@ -238,6 +252,10 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
         axs[2].set_title('Prediction')
         axs[2].axis('off')
     else:
+
+        if class_colors:
+            mask_pred = colorize_mask(mask_pred, class_colors)
+
         fig, axs = plt.subplots(1, 2, figsize=(15, 5))
         axs[0].imshow(image)
         axs[0].set_title(f'{img_path.stem}')
@@ -254,5 +272,5 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
                    for color in class_colors.values()]
         axs[2].legend(handles, class_labels.values(), bbox_to_anchor=(1.05, 1), loc='upper left')
 
-    plt.savefig(output_path)
+    plt.savefig(output_path, bbox_inches='tight', dpi=300)
     plt.close()

@@ -246,7 +246,18 @@ def main(cfg: DictConfig):
     # Output folder for inference results
     output_dir_infer = Path(logger.log_dir) / "sample_inference"
     output_dir_infer.mkdir(parents=True, exist_ok=True)
+  
+    class_colors = {
+    0: [0, 0, 0],          # background -> black
+    1: [255, 182, 193],        # monocot -> green
+    2: [173, 216, 230],        # dicot -> red
+}
 
+    class_labels = {
+        0: "Background/soil",
+        1: "Grass",
+        2: "Hairy vetch",
+    }
     # Inference loop
     for idx in range(len(inference_dataset)):
         image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
@@ -264,7 +275,7 @@ def main(cfg: DictConfig):
         img_path = Path(inference_images[0]).parent / f"{mask_stem}.jpg"
         print(img_path)
         print(output_path)
-        side_by_side_plot(img_path, None, mask_pred, output_path)
+        side_by_side_plot(img_path, None, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
 
     log.info(f"Saved unlabeled inference predictions to {output_dir_infer}")
 
