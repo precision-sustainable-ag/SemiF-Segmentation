@@ -51,9 +51,19 @@ jobs:
       - name: Push metrics and prediction plot to training-artifacts branch
         run: |
           IMAGE_NAME="metrics_${GITHUB_RUN_ID}.png"
-          PRED_NAME="predictions_${GITHUB_RUN_ID}.png"
           IMAGE_PATH="assets/$IMAGE_NAME"
+          
+          PRED_NAME="predictions_${GITHUB_RUN_ID}.png"
           PRED_PATH="assets/$PRED_NAME"
+          
+          INF0_NAME="inference0_${GITHUB_RUN_ID}.png"
+          INF0_PATH="assets/$INF0_NAME"
+          
+          INF1_NAME="inference1_${GITHUB_RUN_ID}.png"
+          INF1_PATH="assets/$INF1_NAME"
+          
+          INF2_NAME="inference2_${GITHUB_RUN_ID}.png"
+          INF2_PATH="assets/$INF2_NAME"
 
           mkdir -p assets
           if [ -f "$VERSION_DIR/metrics.png" ]; then
@@ -61,10 +71,29 @@ jobs:
           else
             echo "⚠️ WARNING: $VERSION_DIR/metrics.png not found. Skipping copy."
           fi
+          
           if [ -f "$VERSION_DIR/sample_predictions/test_prediction.png" ]; then
             cp "$VERSION_DIR/sample_predictions/test_prediction.png" "$PRED_PATH"
           else
             echo "⚠️ WARNING: $VERSION_DIR/sample_predictions/test_prediction.png not found. Skipping copy."
+          fi
+
+          if [ -f "$VERSION_DIR/sample_inference/inference0.png" ]; then
+            cp "$VERSION_DIR/sample_inference/inference0.png" "$INF0_PATH"
+          else
+            echo "⚠️ WARNING: $VERSION_DIR/sample_inference/inference0.png not found. Skipping copy."
+          fi
+
+          if [ -f "$VERSION_DIR/sample_inference/inference1.png" ]; then
+            cp "$VERSION_DIR/sample_inference/inference1.png" "$INF1_PATH"
+          else
+            echo "⚠️ WARNING: $VERSION_DIR/sample_inference/inference1.png not found. Skipping copy."
+          fi
+
+          if [ -f "$VERSION_DIR/sample_inference/inference2.png" ]; then
+            cp "$VERSION_DIR/sample_inference/inference2.png" "$INF2_PATH"
+          else
+            echo "⚠️ WARNING: $VERSION_DIR/sample_inference/inference2.png not found. Skipping copy."
           fi
 
           # Setup Git identity
@@ -95,10 +124,16 @@ jobs:
           mkdir -p artifacts_worktree/assets
           cp "$IMAGE_PATH" artifacts_worktree/assets/
           cp "$PRED_PATH" artifacts_worktree/assets/
+          cp "$INF0_PATH" artifacts_worktree/assets/
+          cp "$INF1_PATH" artifacts_worktree/assets/
+          cp "$INF2_PATH" artifacts_worktree/assets/
 
           cd artifacts_worktree
           git add "assets/$IMAGE_NAME"
           git add "assets/$PRED_NAME"
+          git add "assets/$INF0_NAME"
+          git add "assets/$INF1_NAME"
+          git add "assets/$INF2_NAME"
           git commit -m "Add metrics and predictions for run $GITHUB_RUN_ID"
           git push origin HEAD:refs/heads/training-artifacts
           cd ..

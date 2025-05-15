@@ -99,15 +99,23 @@ def main():
     
     image_url = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/metrics_{run_id}.png"
     prediction_url = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/predictions_{run_id}.png"
+
+    inf0 = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/inference0_{run_id}.png"
+    inf1 = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/inference1_{run_id}.png"
+    inf2 = f"https://raw.githubusercontent.com/{repo}/training-artifacts/assets/inference2_{run_id}.png"
+
+
     image_md = f"![Training Plots]({image_url})"
     prediction_md = f"![Sample Prediction]({prediction_url})"
+
+    inf0_md = f"![Inference 0]({inf0})"
+    inf1_md = f"![Inference 1]({inf1})"
+    inf2_md = f"![Inference 2]({inf2})"
 
     run_info_file = "logs/run_info.json"
     run_info_md = format_run_info(run_info_file)
     
     metrics_file = os.path.join(version_dir, "metrics.csv")
-    sample_predictions_dir = Path(version_dir) / "sample_predictions"
-    sample_predictions = list(sample_predictions_dir.glob("*.png"))
 
     _, _, markdown_table = extract_metrics(metrics_file)
     
@@ -137,8 +145,22 @@ def main():
 {image_md}
 
 #### 📸 Sample Prediction
+
 {prediction_md}
 
+#### 📸 Inference 0
+
+{inf0_md}
+
+#### 📸 Inference 1
+
+{inf1_md}
+
+#### 📸 Inference 2
+
+{inf2_md}
+
+---
 _Triggered by push to `develop` branch._
 """
 

@@ -195,19 +195,25 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
     image = cv2.imread(str(img_path))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
 
-    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
-
-    axs[0].imshow(image)
-    axs[0].set_title('Image')
-    axs[0].axis('off')
-
-    axs[1].imshow(mask_gt, cmap='jet', interpolation='nearest')
-    axs[1].set_title('Ground Truth')
-    axs[1].axis('off')
-
-    axs[2].imshow(mask_pred, cmap='jet', interpolation='nearest')
-    axs[2].set_title('Prediction')
-    axs[2].axis('off')
+    if mask_gt is not None:
+        fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+        axs[0].imshow(image)
+        axs[0].set_title(f'{img_path.stem}')
+        axs[0].axis('off')
+        axs[1].imshow(mask_gt, cmap='jet', interpolation='nearest')
+        axs[1].set_title('Ground Truth')
+        axs[1].axis('off')
+        axs[2].imshow(mask_pred, cmap='jet', interpolation='nearest')
+        axs[2].set_title('Prediction')
+        axs[2].axis('off')
+    else:
+        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+        axs[0].imshow(image)
+        axs[0].set_title(f'{img_path.stem}')
+        axs[0].axis('off')
+        axs[1].imshow(mask_pred, cmap='jet', interpolation='nearest')
+        axs[1].set_title('Prediction')
+        axs[1].axis('off')
 
     plt.tight_layout()
 

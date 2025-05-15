@@ -206,7 +206,6 @@ def main(cfg: DictConfig):
     output_dir = Path(logger.log_dir) / "sample_predictions"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Randomly select 5 samples from val_dataset
     
     sample = test_dataset[0]
     image = sample[0].unsqueeze(0).to(best_model.device)  # add batch dim
@@ -225,6 +224,47 @@ def main(cfg: DictConfig):
     side_by_side_plot(img_path, mask_gt, mask_pred, output_path)
 
     log.info(f"Saved sample predictions to {output_dir}")
+
+    # === Sample Inference on Unlabeled Images === #
+    log.info("Running inference on sample unlabeled images...")
+
+    inference_images = [Path(cfg.paths.root_dir, x) for x in cfg.train.sample_inference]  # List of image paths
+
+    # Dummy mask paths just to satisfy Dataset interface
+    dummy_masks = inference_images  # dummy paths, ignored during inference
+
+    # Load Dataset
+    inference_dataset = Dataset(
+        images_dir=inference_images,
+        masks_dir=dummy_masks,  # dummy
+        augmentation=None,      # no augmentation needed
+        normalize_image=cfg.train.dataset.normalize,
+        mean=mean,
+        std=std
+    )
+
+    # Output folder for inference results
+    output_dir_infer = Path(logger.log_dir) / "sample_inference"
+    output_dir_infer.mkdir(parents=True, exist_ok=True)
+
+    # Inference loop
+    for idx in range(len(inference_dataset)):
+        image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
+
+        image = image_tensor.unsqueeze(0).to(best_model.device)
+
+        with torch.no_grad():
+            output = best_model(image)
+            mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
+
+        # Save visualization
+        output_path = output_dir_infer / f"inference{idx}.png"
+        img_path = Path(inference_images[0]).parent / f"{mask_stem}.jpg"
+        print(img_path)
+        print(output_path)
+        side_by_side_plot(img_path, None, mask_pred, output_path)
+
+    log.info(f"Saved unlabeled inference predictions to {output_dir_infer}")
 
 if __name__ == "__main__":
     main()

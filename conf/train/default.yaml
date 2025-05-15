@@ -1,5 +1,5 @@
 mode: train
-epochs: 50
+epochs: 1
 batch_size: 4
 seed: 42
 augment: default
@@ -34,3 +34,8 @@ callbacks:
   mode: max
   save_top_k: 1
   save_last: true
+
+sample_inference:
+  - "data/rye_vetch/biomass-data/images/NC01_2024_CC_TM-2_TR-102_5_rgb_1c1d663f-5fbb-4959-a26a-dfa369eb9a9c.jpg" # mostly vetch
+  - "data/rye_vetch/biomass-data/images/OH_2024_CC_TM-2_TR-001_1_rgb_0ed7bc9f-c90f-4ce1-9ccc-8ffad0f2f3b0.jpg" # balanced
+  - "data/rye_vetch/biomass-data/images/PA_2024_CC_TM-1_TR-002_5_rgb_02ec0f25-0318-45ba-a2a9-8c7c5b0635e4.jpg" # mostly grass
