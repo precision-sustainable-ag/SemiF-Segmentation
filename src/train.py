@@ -43,12 +43,12 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
     """
     valid_per_image_iou = val_result[0]["valid_per_image_iou"]
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
-
+    version_dir = Path(logger.log_dir)
+    relative_path = version_dir.relative_to(cfg.paths.persistent_dir)
     run_info = {
         "project_name": cfg.project.name,
         "timestamp": datetime.now().isoformat(),
-        "version_dir": str(logger.log_dir),
-        
+        "version_dir": str(relative_path),
         "model_name": cfg.model.arch_name,
         "encoder": cfg.model.encoder_name,
         "encoder_weights": cfg.model.encoder_weights,
@@ -60,10 +60,8 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
         "image_size": f"{cfg.preprocess.grid_crop.crop_height}x{cfg.preprocess.grid_crop.crop_width}",
         "training_images": len(list(Path(cfg.paths.split_dir, "train", "images").glob("*.jpg"))),
         "validation_images": len(list(Path(cfg.paths.split_dir, "val", "images").glob("*.jpg"))),
-
         "valid_dataset_iou": valid_dataset_iou,
         "valid_per_image_iou": valid_per_image_iou,
-        
         }
 
     Path("logs").mkdir(exist_ok=True)

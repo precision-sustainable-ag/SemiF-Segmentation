@@ -126,42 +126,36 @@ def main():
 
     title = f"Training Report - {project_name} - {version} - {model_name} - {encoder}"
     body = f"""
-### 🧠 Segmentation Model Training Report
+## Segmentation Model Training Report
 
 **Project:** `{project_name}`  
 **Run Time:** `{datetime.now().isoformat()}`
 
 
-#### 📊 Last 10 Training Steps
-
-{markdown_table}
-
----
-
-#### 📝 Run Info Summary
+### Run Info Summary
 
 {run_info_md}
 
 ---
 
-#### 📈 Training Plots
+#### Last 10 Training Steps
+
+{markdown_table}
+
+---
+
+#### Loss and IoU
 
 {image_md}
 
-#### 📸 Sample Prediction
+#### Test Set Prediction
 
 {prediction_md}
 
-#### 📸 Inference 0
+#### Real-World Predictions
 
 {inf0_md}
-
-#### 📸 Inference 1
-
 {inf1_md}
-
-#### 📸 Inference 2
-
 {inf2_md}
 
 ---
