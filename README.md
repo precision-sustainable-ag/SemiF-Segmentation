@@ -1,66 +1,82 @@
-# Tutorial: SemiF-Segmentation
+# SemiF-Segmentation
 
-This project provides a pipeline for **image segmentation**.
-It allows users to *query* specific image data from a database, *preprocess* it (e.g., cropping, relabeling), *train* a segmentation model (like UNet or DeepLabV3+) using Pytorch Lightning, and finally *run inference* to generate segmentation masks on new images.
-The entire process is managed using **Hydra** configuration, making it easy to configure experiments and swap components like models or data augmentation techniques.
+This project is designed for **segmenting** objects (like plants) in images.
+It uses the SemiField **database** to find relevant images based on criteria,
+**prepares** the image data through steps like cropping and remapping,
+**trains** a deep learning model for segmentation,
+and then runs **inference** to generate masks on new images.
+Everything is controlled via a flexible **configuration system**.
 
 
 ```mermaid
 flowchart TD
-    A0["Hydra Configuration Management"]
-    A1["Task Orchestration (main.py)"]
-    A2["Data Querying & Sampling (query.py)"]
-    A3["Preprocessing Pipeline (preprocess.py & src/preprocessing/)"]
-    A4["Segmentation Model Module (model.py)"]
-    A5["Data Loading & Augmentation (datasets.py, augs.py)"]
-    A6["Training Orchestration (train.py)"]
-    A7["Inference Pipeline (inference.py)"]
-    A8["File Synchronization (sync.py)"]
-
-    A0 -- "Provides Config" --> A1
-    A0 -- "Provides Config" --> A2
-    A0 -- "Provides Config" --> A3
-    A0 -- "Provides Config" --> A4
-    A0 -- "Provides Config" --> A5
-    A0 -- "Provides Config" --> A6
-    A0 -- "Provides Config" --> A7
-    A0 -- "Provides Config" --> A8
-
-    A1 -- "Calls Query Task" --> A2
-    A1 -- "Calls Preprocess Task" --> A3
-    A1 -- "Calls Train Task" --> A6
-    A1 -- "Calls Inference Task" --> A7
-    A1 -- "Calls Sync Task" --> A8
-
-    A2 -- "Provides data list" --> A3
-    A3 -- "Prepares data for Loading" --> A6
-    A6 -- "Uses DataLoader" --> A5
-    A5 -- "Provides data batches" --> A4
-    A6 -- "Instantiates & Trains Model" --> A4
-    A4 -- "Provides Model for Inference" --> A7
-    A8 -- "Updates DB for Query" --> A2
+    A0["Hydra Configuration System
+"]
+    A1["Main Task Runner
+"]
+    A2["Data Synchronization (Sync)
+"]
+    A3["Database Querying & Sampling (Query)
+"]
+    A4["Data Preprocessing Pipeline
+"]
+    A5["Dataset Loader
+"]
+    A6["Data Augmentation
+"]
+    A7["Segmentation Model Module (Training/Validation)
+"]
+    A8["Inference Pipeline
+"]
+    A9["Visualization Utilities
+"]
+    A0 -- "Starts execution" --> A1
+    A1 -- "Orchestrates task" --> A2
+    A1 -- "Orchestrates task" --> A3
+    A1 -- "Orchestrates task" --> A4
+    A1 -- "Orchestrates task" --> A7
+    A1 -- "Orchestrates task" --> A8
+    A0 -- "Configures" --> A2
+    A0 -- "Configures" --> A3
+    A0 -- "Configures" --> A4
+    A0 -- "Configured by" --> A5
+    A0 -- "Configures" --> A6
+    A0 -- "Configures" --> A7
+    A0 -- "Configures" --> A8
+    A3 -- "Provides queried data" --> A4
+    A4 -- "Outputs processed data for" --> A5
+    A5 -- "Feeds data to" --> A7
+    A5 -- "Feeds data to" --> A8
+    A6 -- "Provides transformations to" --> A5
+    A7 -- "Provides trained model" --> A8
+    A7 -- "Generates metrics/plots" --> A9
+    A8 -- "Loads trained model from" --> A7
+    A8 -- "Visualizes results" --> A9
 ```
 
 ## Chapters
 
-1. [Task Orchestration (`main.py`)
-](docs/01_task_orchestration___main_py___.md)
-2. [Hydra Configuration Management
-](docs/02_hydra_configuration_management_.md)
-3. [Data Querying & Sampling (`query.py`)
-](docs/03_data_querying___sampling___query_py___.md)
-4. [Preprocessing Pipeline (`preprocess.py` & `src/preprocessing/`)
-](docs/04_preprocessing_pipeline___preprocess_py_____src_preprocessing____.md)
-5. [Data Loading & Augmentation (`datasets.py`, `augs.py`)
-](docs/05_data_loading___augmentation___datasets_py____augs_py___.md)
-6. [Segmentation Model Module (`model.py`)
-](docs/06_segmentation_model_module___model_py___.md)
-7. [Training Orchestration (`train.py`)
-](docs/07_training_orchestration___train_py___.md)
-8. [Inference Pipeline (`inference.py`)
-](docs/08_inference_pipeline___inference_py___.md)
-9. [File Synchronization (`sync.py`)
-](docs/09_file_synchronization___sync_py___.md)
+1. [Hydra Configuration System
+](docs/01_hydra_configuration_system_.md)
+2. [Main Task Runner
+](docs/02_main_task_runner_.md)
+3. [Data Synchronization (Sync)
+](docs/03_data_synchronization__sync__.md)
+4. [Database Querying & Sampling (Query)
+](docs/04_database_querying___sampling__query__.md)
+5. [Data Preprocessing Pipeline
+](docs/05_data_preprocessing_pipeline_.md)
+6. [Data Augmentation
+](docs/06_data_augmentation_.md)
+7. [Dataset Loader
+](docs/07_dataset_loader_.md)
+8. [Segmentation Model Module (Training/Validation)
+](docs/08_segmentation_model_module__training_validation__.md)
+9. [Inference Pipeline
+](docs/09_inference_pipeline_.md)
+10. [Visualization Utilities
+](docs/10_visualization_utilities_.md)
+
 
 ---
 
