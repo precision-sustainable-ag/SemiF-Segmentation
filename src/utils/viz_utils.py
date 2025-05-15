@@ -232,8 +232,6 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
     """
     image = cv2.imread(str(img_path))
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
-    
-    
 
     # Colorize masks if class_colors provided
     if mask_gt is not None:
@@ -270,7 +268,10 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
     if class_colors and class_labels:
         handles = [plt.Line2D([0], [0], marker='s', color='w', markerfacecolor=np.array(color)/255, markersize=10)
                    for color in class_colors.values()]
-        axs[2].legend(handles, class_labels.values(), bbox_to_anchor=(1.05, 1), loc='upper left')
+        if mask_gt is not None:
+            axs[2].legend(handles, class_labels.values(), bbox_to_anchor=(1.05, 1), loc='upper left')
+        else:
+            axs[1].legend(handles, class_labels.values(), bbox_to_anchor=(1.05, 1), loc='upper left')
 
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
     plt.close()

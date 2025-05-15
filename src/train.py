@@ -199,6 +199,18 @@ def main(cfg: DictConfig):
     best_model.save_model(model_dir, "best_model")
 
     # === Sample Inference on 5 Validation Images === #
+
+    class_colors = {
+        0: [0, 0, 0],          # background -> black
+        1: [255, 182, 193],        # monocot -> green
+        2: [173, 216, 230],        # dicot -> red
+    }
+
+    class_labels = {
+        0: "Background/soil",
+        1: "Grass",
+        2: "Hairy vetch",
+    }
     log.info("Running sample inference on validation images...")
 
     best_model.eval()  # set model to eval mode
@@ -212,7 +224,6 @@ def main(cfg: DictConfig):
     mask_gt = sample[1].cpu().numpy().squeeze()
     mask_stem = sample[2]
     img_path = test_image_dir / f"{mask_stem}.jpg"
-    print(img_path)
 
     with torch.no_grad():
         output = best_model(image)
@@ -221,7 +232,7 @@ def main(cfg: DictConfig):
     # Save side-by-side plot
     output_path = output_dir / f"test_prediction.png"
 
-    side_by_side_plot(img_path, mask_gt, mask_pred, output_path)
+    side_by_side_plot(img_path, mask_gt, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
 
     log.info(f"Saved sample predictions to {output_dir}")
 
@@ -247,17 +258,6 @@ def main(cfg: DictConfig):
     output_dir_infer = Path(logger.log_dir) / "sample_inference"
     output_dir_infer.mkdir(parents=True, exist_ok=True)
   
-    class_colors = {
-    0: [0, 0, 0],          # background -> black
-    1: [255, 182, 193],        # monocot -> green
-    2: [173, 216, 230],        # dicot -> red
-}
-
-    class_labels = {
-        0: "Background/soil",
-        1: "Grass",
-        2: "Hairy vetch",
-    }
     # Inference loop
     for idx in range(len(inference_dataset)):
         image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
