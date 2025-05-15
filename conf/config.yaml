@@ -3,7 +3,7 @@ defaults:
   - query: default           # Default query config
   - preprocess: default          # Default training config
   - augment: default  # Default augmentations config
-  - model: segformer         # Model config (segformer, deeplabv3plus)
+  - model: deeplabv3plus         # Model config (segformer, deeplabv3plus)
   - train: default         # Train config
   - inference: default      # Inference config
   

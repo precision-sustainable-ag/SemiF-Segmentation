@@ -16,7 +16,7 @@ def format_run_info(run_info_path: str) -> str:
     lines = ["| Key | Value |", "|------|-------|"]
     for k, v in info.items():
         lines.append(f"| {k} | {v} |")
-    return "\n".join(lines)
+    return "\n".join(lines), info
 
 def extract_metrics(csv_path):
     if not os.path.exists(csv_path):
@@ -113,14 +113,18 @@ def main():
     inf2_md = f"![Inference 2]({inf2})"
 
     run_info_file = "logs/run_info.json"
-    run_info_md = format_run_info(run_info_file)
+    run_info_md, info = format_run_info(run_info_file)
     
     metrics_file = os.path.join(version_dir, "metrics.csv")
 
     _, _, markdown_table = extract_metrics(metrics_file)
     
+    version = Path(info["version_dir"]).stem
+    model_name = info["model_name"]
+    encoder = info["encoder"]
+    
 
-    title = f"Training Report - {project_name} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    title = f"Training Report - {project_name} - {version} - {model_name} - {encoder}"
     body = f"""
 ### 🧠 Segmentation Model Training Report
 
