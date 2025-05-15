@@ -1,5 +1,5 @@
 arch_name: DeepLabV3Plus
-encoder_name: mobilenet_v2 #mobilenet_v2, resnet18,resnet34, resnet101, resnet152, resnext50_32x4d, resnext101_32x4d, resnext101_32x8d, resnext101_32x16d(instagram), resnext101_32x32d(instagram), resnext101_32x48d(instagram), mit_b0, mit_b1, mit_b2, mit_b3, mit_b4, mit_b5
+encoder_name: resnet18 #mobilenet_v2, resnet18,resnet34, resnet101, resnet152, resnext50_32x4d, resnext101_32x4d, resnext101_32x8d, resnext101_32x16d(instagram), resnext101_32x32d(instagram), resnext101_32x48d(instagram), mit_b0, mit_b1, mit_b2, mit_b3, mit_b4, mit_b5
 encoder_weights: imagenet
 in_channels: 3
 out_classes: ${train.out_classes}
