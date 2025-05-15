@@ -46,6 +46,9 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
 
     run_info = {
         "version_dir": str(logger.log_dir),
+        "model_name": cfg.model.arch_name,
+        "encoder": cfg.model.encoder_name,
+        "encoder_weights": cfg.model.encoder_weights,
         "project_name": cfg.project.name,
         "timestamp": datetime.now().isoformat(),
         "valid_dataset_iou": valid_dataset_iou,

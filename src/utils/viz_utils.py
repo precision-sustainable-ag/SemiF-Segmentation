@@ -193,6 +193,7 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
     Plot Image | Ground Truth | Prediction side by side and save.
     """
     image = cv2.imread(str(img_path))
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
 
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
 
