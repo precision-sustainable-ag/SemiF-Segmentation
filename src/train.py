@@ -43,12 +43,10 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
     """
     valid_per_image_iou = val_result[0]["valid_per_image_iou"]
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
-    version_dir = Path(logger.log_dir)
-    relative_path = version_dir.relative_to(cfg.paths.persistent_dir)
     run_info = {
         "project_name": cfg.project.name,
         "timestamp": datetime.now().isoformat(),
-        "version_dir": str(relative_path),
+        "version_dir": str(Path(logger.log_dir)),
         "model_name": cfg.model.arch_name,
         "encoder": cfg.model.encoder_name,
         "encoder_weights": cfg.model.encoder_weights,
@@ -93,7 +91,6 @@ def main(cfg: DictConfig):
     test_mask_dir = split_data_dir / "test" / "masks"
 
     checkpoint_dir = Path(logger.log_dir, "checkpoints")
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
     
     # Callbacks
     best_checkpoint = ModelCheckpoint(
@@ -152,16 +149,12 @@ def main(cfg: DictConfig):
         num_workers=cfg.train.dataset.workers
         )
     
-    
     sample_dataloader = DataLoader(
         train_dataset, 
         batch_size=cfg.train.batch_size, 
         shuffle=True, 
         num_workers=cfg.train.dataset.workers
         )
-    viz_batch(sample_dataloader, output_dir=logger.log_dir)
-    
-    del sample_dataloader
 
     # Model
     model = SegmentationModule(cfg)
@@ -179,6 +172,12 @@ def main(cfg: DictConfig):
         logger=logger,
         # num_nodes=len(nodes)
     )
+    is_rank_zero = trainer.is_global_zero
+    
+    if is_rank_zero:
+        viz_batch(sample_dataloader, output_dir=logger.log_dir)
+    del sample_dataloader
+
     trainer.fit(model, train_loader, val_loader)
     
     # Validate
@@ -200,10 +199,11 @@ def main(cfg: DictConfig):
         checkpoint_path=best_model_ckpt_path,
     )
     # Create a directory to save the model
-    model_dir = Path(logger.log_dir, "model")
-    model_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Best model being saved to: {Path(model_dir, 'best_model')}.pth")
-    best_model.save_model(model_dir, "best_model")
+    if is_rank_zero:
+        model_dir = Path(logger.log_dir, "model")
+        model_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Best model being saved to: {Path(model_dir, 'best_model')}.pth")
+        best_model.save_model(model_dir, "best_model")
 
     # === Sample Inference on 5 Validation Images === #
 
@@ -218,79 +218,80 @@ def main(cfg: DictConfig):
         1: "Grass",
         2: "Hairy vetch",
     }
-    log.info("Running sample inference on validation images...")
 
-    best_model.eval()  # set model to eval mode
+    if is_rank_zero:
+        log.info("Running sample inference on validation images...")
 
-    output_dir = Path(logger.log_dir) / "sample_predictions"
-    output_dir.mkdir(parents=True, exist_ok=True)
+        best_model.eval()  # set model to eval mode
 
-    
-    sample = test_dataset[0]
-    image = sample[0].unsqueeze(0).to(best_model.device)  # add batch dim
-    mask_gt = sample[1].cpu().numpy().squeeze()
-    mask_stem = sample[2]
-    img_path = test_image_dir / f"{mask_stem}.jpg"
+        output_dir = Path(logger.log_dir) / "sample_predictions"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    with torch.no_grad():
-        output = best_model(image)
-        mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
-
-    # Save side-by-side plot
-    output_path = output_dir / f"test_prediction.png"
-
-    side_by_side_plot(img_path, mask_gt, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
-
-    log.info(f"Saved sample predictions to {output_dir}")
-
-    # === Sample Inference on Unlabeled Images === #
-    log.info("Running inference on sample unlabeled images...")
-
-    inference_images = [Path(cfg.paths.persistent_dir, x) for x in cfg.train.sample_inference]  # List of image paths
-
-    # Dummy mask paths just to satisfy Dataset interface
-    dummy_masks = inference_images  # dummy paths, ignored during inference
-
-    # Load Dataset
-    inference_dataset = Dataset(
-        images_dir=inference_images,
-        masks_dir=dummy_masks,  # dummy
-        augmentation=None,      # no augmentation needed
-        normalize_image=cfg.train.dataset.normalize,
-        mean=mean,
-        std=std
-    )
-
-    # Output folder for inference results
-    output_dir_infer = Path(logger.log_dir) / "sample_inference"
-    output_dir_infer.mkdir(parents=True, exist_ok=True)
-  
-    # Inference loop
-    for idx in range(len(inference_dataset)):
-        image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
-        # Pad to multiple of 16
-        if "deeplab" in cfg.model.arch_name.lower():
-            multiple = 16
-        elif "segformer" in cfg.model.arch_name.lower():
-            multiple = 32
-        else:
-            multiple = 16
-            log.info(f"Unknown model architecture: {cfg.model.arch_name}. Using default padding multiple of 16.")
-        
-        image_padded = pad_to_multiple(image_tensor, multiple=multiple)
-
-        image = image_padded.unsqueeze(0).to(best_model.device)
+        sample = test_dataset[0]
+        image = sample[0].unsqueeze(0).to(best_model.device)  # add batch dim
+        mask_gt = sample[1].cpu().numpy().squeeze()
+        mask_stem = sample[2]
+        img_path = test_image_dir / f"{mask_stem}.jpg"
 
         with torch.no_grad():
             output = best_model(image)
             mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
 
-        # Save visualization
-        output_path = output_dir_infer / f"inference{idx}.png"
-        img_path = Path(inference_images[0]).parent / f"{mask_stem}.jpg"
-        side_by_side_plot(img_path, None, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
+        # Save side-by-side plot
+        output_path = output_dir / f"test_prediction.png"
 
-    log.info(f"Saved unlabeled inference predictions to {output_dir_infer}")
+        side_by_side_plot(img_path, mask_gt, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
+
+        log.info(f"Saved sample predictions to {output_dir}")
+
+        # === Sample Inference on Unlabeled Images === #
+        log.info("Running inference on sample unlabeled images...")
+
+        inference_images = [Path(cfg.paths.persistent_dir, x) for x in cfg.train.sample_inference]  # List of image paths
+
+        # Dummy mask paths just to satisfy Dataset interface
+        dummy_masks = inference_images  # dummy paths, ignored during inference
+
+        # Load Dataset
+        inference_dataset = Dataset(
+            images_dir=inference_images,
+            masks_dir=dummy_masks,  # dummy
+            augmentation=None,      # no augmentation needed
+            normalize_image=cfg.train.dataset.normalize,
+            mean=mean,
+            std=std
+        )
+
+        # Output folder for inference results
+        output_dir_infer = Path(logger.log_dir) / "sample_inference"
+        output_dir_infer.mkdir(parents=True, exist_ok=True)
+    
+        # Inference loop
+        for idx in range(len(inference_dataset)):
+            image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
+            # Pad to multiple of 16
+            if "deeplab" in cfg.model.arch_name.lower():
+                multiple = 16
+            elif "segformer" in cfg.model.arch_name.lower():
+                multiple = 32
+            else:
+                multiple = 16
+                log.info(f"Unknown model architecture: {cfg.model.arch_name}. Using default padding multiple of 16.")
+            
+            image_padded = pad_to_multiple(image_tensor, multiple=multiple)
+
+            image = image_padded.unsqueeze(0).to(best_model.device)
+
+            with torch.no_grad():
+                output = best_model(image)
+                mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
+
+            # Save visualization
+            output_path = output_dir_infer / f"inference{idx}.png"
+            img_path = Path(inference_images[0]).parent / f"{mask_stem}.jpg"
+            side_by_side_plot(img_path, None, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
+
+        log.info(f"Saved unlabeled inference predictions to {output_dir_infer}")
 
 if __name__ == "__main__":
     main()
