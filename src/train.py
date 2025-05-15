@@ -228,7 +228,7 @@ def main(cfg: DictConfig):
     # === Sample Inference on Unlabeled Images === #
     log.info("Running inference on sample unlabeled images...")
 
-    inference_images = [Path(cfg.paths.root_dir, x) for x in cfg.train.sample_inference]  # List of image paths
+    inference_images = [Path(cfg.paths.persistent_dir, x) for x in cfg.train.sample_inference]  # List of image paths
 
     # Dummy mask paths just to satisfy Dataset interface
     dummy_masks = inference_images  # dummy paths, ignored during inference
