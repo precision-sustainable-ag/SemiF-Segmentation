@@ -8,7 +8,7 @@ out_classes: 3
 
 
 loss:
-  name: DiceBCELoss # smpDiceLoss, DiceFocalLoss, DiceBCELoss, DiceWithBoundaryLoss, DiceCrossEntropy
+  name: smpDiceLoss # smpDiceLoss, DiceFocalLoss, DiceBCELoss, DiceWithBoundaryLoss, DiceCrossEntropy
 
 lr:
   base_lr: 0.001

@@ -45,16 +45,25 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
 
     run_info = {
+        "project_name": cfg.project.name,
+        "timestamp": datetime.now().isoformat(),
         "version_dir": str(logger.log_dir),
+        
         "model_name": cfg.model.arch_name,
         "encoder": cfg.model.encoder_name,
         "encoder_weights": cfg.model.encoder_weights,
-        "project_name": cfg.project.name,
-        "timestamp": datetime.now().isoformat(),
-        "valid_dataset_iou": valid_dataset_iou,
-        "valid_per_image_iou": valid_per_image_iou,
+        "loss_function": cfg.train.loss.name,
+        "base_lr": cfg.train.lr.base_lr,
+        "num_GPUs": len(list(cfg.train.cuda_visible_devices)),
         "num_epochs": cfg.train.epochs,
         "batch_size": cfg.train.batch_size,
+        "image_size": f"{cfg.preprocess.grid_crop.crop_height}x{cfg.preprocess.grid_crop.crop_width}",
+        "training_images": len(list(Path(cfg.paths.split_dir, "train", "images").glob("*.jpg"))),
+        "validation_images": len(list(Path(cfg.paths.split_dir, "val", "images").glob("*.jpg"))),
+
+        "valid_dataset_iou": valid_dataset_iou,
+        "valid_per_image_iou": valid_per_image_iou,
+        
         }
 
     Path("logs").mkdir(exist_ok=True)
@@ -264,8 +273,12 @@ def main(cfg: DictConfig):
         # Pad to multiple of 16
         if "deeplab" in cfg.model.arch_name.lower():
             multiple = 16
-        elif "unet" in cfg.model.arch_name.lower():
+        elif "segformer" in cfg.model.arch_name.lower():
             multiple = 32
+        else:
+            multiple = 16
+            log.info(f"Unknown model architecture: {cfg.model.arch_name}. Using default padding multiple of 16.")
+        
         image_padded = pad_to_multiple(image_tensor, multiple=multiple)
 
         image = image_padded.unsqueeze(0).to(best_model.device)

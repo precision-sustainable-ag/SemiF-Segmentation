@@ -174,6 +174,7 @@ class SegmentationModule(pl.LightningModule):
         """
         super().__init__()
         self.save_hyperparameters()
+        self.cfg = cfg
         self.arch_name=cfg.model.arch_name
         self.encoder_name=cfg.model.encoder_name
         self.encoder_weights=cfg.model.encoder_weights
@@ -231,6 +232,7 @@ class SegmentationModule(pl.LightningModule):
                 ce = torch.nn.CrossEntropyLoss(ignore_index=self.ignore_index)
                 return lambda logits, targets: 0.5 * dice(logits, targets) + 0.5 * ce(logits, targets)
             else:
+                self.cfg.train.loss.name = "smpDiceLoss"
                 return smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
             
         else:
