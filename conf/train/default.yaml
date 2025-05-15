@@ -1,6 +1,6 @@
 mode: train
 epochs: 50
-batch_size: 4
+batch_size: 2
 seed: 42
 augment: default
 class_mode: multiclass # multiclass or binary
