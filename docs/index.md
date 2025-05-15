@@ -1,72 +1,83 @@
 # Tutorial: SemiF-Segmentation
 
-This project provides a pipeline for **image segmentation**, allowing users to
-*query* specific data, *preprocess* it (like cropping and remapping), *train* a segmentation model
-using PyTorch Lightning, and finally *run inference* to predict masks on new images.
-The entire process is managed by **Hydra configuration**, making it simple to
-configure experiments and manage different workflow stages.
+This project is designed for **segmenting** objects (like plants) in images.
+It uses a **database** to find relevant images based on criteria,
+**prepares** the image data through steps like cropping and remapping,
+**trains** a deep learning model for segmentation,
+and then runs **inference** to generate masks on new images.
+Everything is controlled via a flexible **configuration system**.
 
 
 **Source Repository:** [None](None)
 
 ```mermaid
 flowchart TD
-    A0["Hydra Configuration
+    A0["Hydra Configuration System
 "]
-    A1["Task Orchestration
+    A1["Main Task Runner
 "]
-    A2["Data Querying
+    A2["Data Synchronization (Sync)
 "]
-    A3["Preprocessing Pipeline
+    A3["Database Querying & Sampling (Query)
 "]
-    A4["Data Loading & Augmentation
+    A4["Data Preprocessing Pipeline
 "]
-    A5["Segmentation Model & Training
+    A5["Dataset Loader
 "]
-    A6["Inference Pipeline
+    A6["Data Augmentation
 "]
-    A7["File Synchronization
+    A7["Segmentation Model Module (Training/Validation)
 "]
-    A0 -- "Configures" --> A1
+    A8["Inference Pipeline
+"]
+    A9["Visualization Utilities
+"]
+    A0 -- "Starts execution" --> A1
+    A1 -- "Orchestrates task" --> A2
+    A1 -- "Orchestrates task" --> A3
+    A1 -- "Orchestrates task" --> A4
+    A1 -- "Orchestrates task" --> A7
+    A1 -- "Orchestrates task" --> A8
     A0 -- "Configures" --> A2
     A0 -- "Configures" --> A3
     A0 -- "Configures" --> A4
-    A0 -- "Configures" --> A5
+    A0 -- "Configured by" --> A5
     A0 -- "Configures" --> A6
     A0 -- "Configures" --> A7
-    A1 -- "Initiates" --> A2
-    A1 -- "Initiates" --> A3
-    A1 -- "Initiates" --> A5
-    A1 -- "Initiates" --> A6
-    A1 -- "Initiates" --> A7
-    A2 -- "Provides data list" --> A3
-    A2 -- "Provides data list" --> A6
-    A3 -- "Provides processed data" --> A5
-    A3 -- "Provides processed data" --> A6
-    A4 -- "Provides data batches" --> A5
-    A4 -- "Provides data batches" --> A6
-    A5 -- "Provides trained model" --> A6
-    A7 -- "Updates database" --> A2
+    A0 -- "Configures" --> A8
+    A3 -- "Provides queried data" --> A4
+    A4 -- "Outputs processed data for" --> A5
+    A5 -- "Feeds data to" --> A7
+    A5 -- "Feeds data to" --> A8
+    A6 -- "Provides transformations to" --> A5
+    A7 -- "Provides trained model" --> A8
+    A7 -- "Generates metrics/plots" --> A9
+    A8 -- "Loads trained model from" --> A7
+    A8 -- "Visualizes results" --> A9
 ```
 
 ## Chapters
 
-1. [Hydra Configuration
-](01_hydra_configuration_.md)
-2. [Task Orchestration
-](02_task_orchestration_.md)
-3. [Data Querying
-](03_data_querying_.md)
-4. [Preprocessing Pipeline
-](04_preprocessing_pipeline_.md)
-5. [Segmentation Model & Training
-](05_segmentation_model___training_.md)
-6. [Inference Pipeline
-](06_inference_pipeline_.md)
-7. [Data Loading & Augmentation
-](07_data_loading___augmentation_.md)
-8. [File Synchronization
-](08_file_synchronization_.md)
+1. [Hydra Configuration System
+](01_hydra_configuration_system_.md)
+2. [Main Task Runner
+](02_main_task_runner_.md)
+3. [Data Synchronization (Sync)
+](03_data_synchronization__sync__.md)
+4. [Database Querying & Sampling (Query)
+](04_database_querying___sampling__query__.md)
+5. [Data Preprocessing Pipeline
+](05_data_preprocessing_pipeline_.md)
+6. [Data Augmentation
+](06_data_augmentation_.md)
+7. [Dataset Loader
+](07_dataset_loader_.md)
+8. [Segmentation Model Module (Training/Validation)
+](08_segmentation_model_module__training_validation__.md)
+9. [Inference Pipeline
+](09_inference_pipeline_.md)
+10. [Visualization Utilities
+](10_visualization_utilities_.md)
 
 
 ---
