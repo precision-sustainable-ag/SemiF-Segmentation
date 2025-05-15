@@ -16,7 +16,7 @@ from pytorch_lightning.utilities import rank_zero_only
 
 from src.utils.datasets import Dataset
 from src.utils.model import SegmentationModule
-from src.utils.viz_utils import viz_batch, side_by_side_plot
+from src.utils.viz_utils import viz_batch, side_by_side_plot, pad_to_multiple
 from src.utils.augs import train_aug, val_aug
 
 log = logging.getLogger(__name__)
@@ -250,8 +250,10 @@ def main(cfg: DictConfig):
     # Inference loop
     for idx in range(len(inference_dataset)):
         image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
+        # Pad to multiple of 16
+        image_padded = pad_to_multiple(image_tensor, multiple=16)
 
-        image = image_tensor.unsqueeze(0).to(best_model.device)
+        image = image_padded.unsqueeze(0).to(best_model.device)
 
         with torch.no_grad():
             output = best_model(image)

@@ -188,6 +188,37 @@ def visualize_predictions(images, masks, pr_masks, output_dir="output", num_samp
         else:
             break
 
+def pad_to_multiple(image: torch.Tensor, multiple: int = 16) -> torch.Tensor:
+    """
+    Pad a CHW image tensor to make H and W divisible by `multiple`.
+    Args:
+        image (torch.Tensor): Image tensor of shape (C, H, W)
+        multiple (int): The multiple to pad to.
+    Returns:
+        torch.Tensor: Padded image tensor (C, H_pad, W_pad)
+    """
+    c, h, w = image.shape
+
+    pad_h = (multiple - h % multiple) % multiple
+    pad_w = (multiple - w % multiple) % multiple
+
+    if pad_h == 0 and pad_w == 0:
+        return image  # Already correct size
+
+    # Pad (top=0, bottom=pad_h, left=0, right=pad_w)
+    image_np = image.cpu().numpy()
+    image_np = np.transpose(image_np, (1, 2, 0))  # CHW -> HWC
+
+    image_np = cv2.copyMakeBorder(
+        image_np,
+        top=0, bottom=pad_h,
+        left=0, right=pad_w,
+        borderType=cv2.BORDER_REFLECT_101
+    )
+
+    image_np = np.transpose(image_np, (2, 0, 1))  # Back to CHW
+    return torch.from_numpy(image_np).to(image.device).float()
+
 def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_colors=None, class_labels=None):
     """
     Plot Image | Ground Truth | Prediction side by side and save.
