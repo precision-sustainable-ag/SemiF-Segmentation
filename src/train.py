@@ -262,7 +262,11 @@ def main(cfg: DictConfig):
     for idx in range(len(inference_dataset)):
         image_tensor, _, mask_stem = inference_dataset[idx]  # ignore dummy mask
         # Pad to multiple of 16
-        image_padded = pad_to_multiple(image_tensor, multiple=16)
+        if "deeplab" in cfg.model.arch_name.lower():
+            multiple = 16
+        elif "unet" in cfg.model.arch_name.lower():
+            multiple = 32
+        image_padded = pad_to_multiple(image_tensor, multiple=multiple)
 
         image = image_padded.unsqueeze(0).to(best_model.device)
 
@@ -273,8 +277,6 @@ def main(cfg: DictConfig):
         # Save visualization
         output_path = output_dir_infer / f"inference{idx}.png"
         img_path = Path(inference_images[0]).parent / f"{mask_stem}.jpg"
-        print(img_path)
-        print(output_path)
         side_by_side_plot(img_path, None, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
 
     log.info(f"Saved unlabeled inference predictions to {output_dir_infer}")
