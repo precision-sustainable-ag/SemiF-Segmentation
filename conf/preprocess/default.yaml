@@ -1,15 +1,15 @@
 tasks:
-  find_images: false
-  remove_nontargets: false # If true, only moves synthetic masks if use_synthetic is true
-  grid_crop: false # successfully tested
-  remap_masks: false # successfully tested
+  find_images: true
+  remove_nontargets: true # If true, only moves synthetic masks if use_synthetic is true
+  grid_crop: true # successfully tested
+  remap_masks: true # successfully tested
   train_val_test_split: true # successfully tested
   
   data_stats: true # successfully tested
   viz_results: false
 
 use_synthetic:
-  enable: true
+  enable: false
   project_name: hairy_vetch
   sub_project:  # ignored if use_all_subprojects is true
   use_all_subprojects: true
@@ -18,11 +18,11 @@ remove_nontargets:
   remove_colorchecker: True
 
 grid_crop:
-  crop_height: 2048
-  crop_width: 2048
+  crop_height: 1024
+  crop_width: 1024
 
 remap_masks:
-  group_name: group # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
+  group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
   process_concurrently: False
 
 train_val_test_split:
