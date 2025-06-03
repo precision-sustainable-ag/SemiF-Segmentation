@@ -1,0 +1,126 @@
+sample:
+    multi_domain_balanced:
+      enabled: true
+      domains: [category.common_name,bbox_bin] # [category.common_name,bbox_bin]
+      samples_per_unique_domain: 100
+      replace: false # Allow or disallow sampling of the same row more than once.
+
+    random:
+      enabled: false
+      dataset_size: 1000
+      replace: false
+    
+    random_state: 42
+
+validated:
+
+category:
+  enabled: true
+  common_name:
+    # - barley
+    # - barnyardgrass
+    # - black oats
+    # - broadleaf signalgrass
+    # - cereal rye
+    # - fall panicum
+    # - giant foxtail
+    # - goosegrass
+    # - italian ryegrass
+    # - johnsongrass
+    # - jungle rice
+    # - large crabgrass
+    # - maize
+    # - oats
+    # - purple nutsedge
+    # - sprawling signalgrass
+    # - texas millet
+    # - triticale
+    # - winter wheat
+    # - yellow foxtail
+  # - barley
+    - barnyardgrass
+  # - black oats
+  # - broadleaf signalgrass
+  # - cereal rye
+    - cocklebur
+  # - colorchecker
+  # - common lambsquarters
+    - common ragweed
+  # - common sunflower
+  # - crimson clover
+    - cultivated radish
+  # - fall panicum
+  # - giant foxtail
+    - goosegrass
+    - hairy vetch
+    - horseweed
+  # - italian ryegrass
+    - jimson weed
+    - johnsongrass
+  # - jungle rice
+  # - kochia
+    - large crabgrass
+    - maize
+    - mustards
+  # - oats
+    - palmer amaranth
+    - pitted morning-glory
+  # - prickly sida
+    - purple nutsedge
+  # - ragweed parthenium
+  # - red clover
+    - sicklepod
+    - smooth pigweed
+  # - soybean
+    - spiny amaranth
+  # - sprawling signalgrass
+  # - texas millet
+  # - triticale
+  # - unknown
+    - upland cotton
+    - velvetleaf
+    - waterhemp
+  # - winter pea
+  # - winter wheat
+    - yellow foxtail
+
+morphological:
+  bbox_area_cm2:
+    enabled: true
+    default:
+      min: 100
+      max: 10000
+    # common_name_ranges: Not implemented
+    #   vetch:
+    #     min: 15
+    #     max: 800
+    #   rye:
+    #     min: 20
+    #     max: 900
+
+  extends_border: # not tested
+    enabled: false
+    status: false
+
+  is_primary: # not tested
+    enabled: false
+    status: false
+
+  blur_effect: # not tested
+    enabled: false
+    min:
+    max:
+
+  num_components: # not tested
+    enabled: false
+    min: 1
+    max: 50
+
+  non_target_weed: # not tested
+    enabled: false
+    status: false
+
+  non_target_weed_pred_conf: # not implemented
+    enabled: false
+    min:
+    max:
