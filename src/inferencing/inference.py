@@ -133,7 +133,7 @@ class Predictor:
 
 
 class Visualizer:
-    def __init__(self, output_dir: Path, plot_cfg, dpi: int = 300, transparent: bool = False):
+    def __init__(self, cfg: DictConfig, output_dir: Path, plot_cfg, dpi: int = 300, transparent: bool = False):
 
         self.output_dir = Path(output_dir)
         self.dpi = dpi
@@ -142,17 +142,27 @@ class Visualizer:
         self.plot_comparisons = plot_cfg.comparisons
         self.plot_overlays = plot_cfg.overlays
         self.plot_image_mask = plot_cfg.image_and_mask
+        self.out_classes = cfg.model.out_classes
         self._setup_dirs()
 
-        self.class_colors = {
-            0: ("Background/Soil", [0, 0, 0]),
-            1: ("Grass", [255, 182, 193]),
-            2: ("Hairy vetch", [173, 216, 230]),
-            3: ("Soil", [152, 251, 152]),
-            4: ("Residue", [255, 160, 122]),
-            5: ("Shadow", [238, 130, 238]),
-            # Add more if needed...
-        }
+        if self.out_classes == 1:
+            # Binary segmentation: only background and foreground
+            self.class_colors = {
+                0: ("Background", [0, 0, 0]),
+                1: ("Vegetation", [255, 160, 122])
+            }
+        else:
+            # Multi-class segmentation: use predefined colors
+            # You can modify this dict to match your dataset's classes and colors
+            self.class_colors = {
+                0: ("Background/Soil", [0, 0, 0]),
+                1: ("Grass", [255, 182, 193]),
+                2: ("Hairy vetch", [173, 216, 230]),
+                3: ("Soil", [152, 251, 152]),
+                4: ("Residue", [255, 160, 122]),
+                5: ("Shadow", [238, 130, 238]),
+                # Add more if needed...
+            }
 
     def _setup_dirs(self):
         self.plots_dst = self.output_dir / "plots"
@@ -166,6 +176,8 @@ class Visualizer:
         """
         Draw and save side-by-side RGB image and colorized mask with legend, using self.class_colors dict.
         """
+        if not self.plot_image_mask:
+            return
         if crop_image is not None:
             image = crop_image
         else:
@@ -180,8 +192,8 @@ class Visualizer:
         # === Build color mask ===
         color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
         for cls_idx, (cls_name, cls_color) in self.class_colors.items():
-            if cls_idx >= out_classes:
-                continue
+            # if cls_idx >= out_classes:
+            #     continue
             color_mask[mask == cls_idx] = cls_color
 
         # === Plot side-by-side ===
@@ -199,8 +211,8 @@ class Visualizer:
         from matplotlib.patches import Patch
         legend_elements = []
         for cls_idx, (cls_name, cls_color) in self.class_colors.items():
-            if cls_idx >= out_classes:
-                continue
+            # if cls_idx >= out_classes:
+            #     continue
             legend_elements.append(Patch(facecolor=np.array(cls_color) / 255.0, edgecolor='black', label=cls_name))
 
         axs[1].legend(handles=legend_elements, loc='lower right', fontsize='small', frameon=True, bbox_to_anchor=(1.05, 0))
@@ -366,7 +378,7 @@ class InferenceRunner:
 
         processor = ImageProcessor(self.mean, self.std, self.cfg)
         predictor = Predictor(model, self.cfg.inference.inference.threshold)
-        visualizer = Visualizer(self.output_dir,self.cfg.inference.inference.plot, self.cfg.inference.inference.plot.dpi, self.cfg.inference.inference.plot.transparent)
+        visualizer = Visualizer(self.cfg, self.output_dir,self.cfg.inference.inference.plot, self.cfg.inference.inference.plot.dpi, self.cfg.inference.inference.plot.transparent)
 
         paths = sorted(self.image_dir.glob("*.jpg"))
         
@@ -398,6 +410,9 @@ class InferenceRunner:
                 # Single full image
                 mask, inf_time = predictor.predict(tensors, self.out_classes)
                 mask_path = self.output_mask_dir / f"{path.stem}.png"
+                # if len(mask.shape) != 3:
+                #     # make the mask 3 channels if it's single channel
+                    # mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) if self.out_classes == 1 else mask
                 cv2.imwrite(str(mask_path), mask * 255 if self.out_classes == 1 else mask)
                 visualizer.draw_overlay(path, mask, self.out_classes)
                 visualizer.draw_comparison(path, mask, self.out_classes)

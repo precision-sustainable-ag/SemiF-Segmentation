@@ -13,7 +13,7 @@ from matplotlib.ticker import MaxNLocator
 log = logging.getLogger(__name__)
 
 
-def deterministic_get_stats(pred: torch.Tensor, target: torch.Tensor, mode: str, num_classes: int = 1, ignore_index: int = None):
+def deterministic_get_stats(pred: torch.Tensor, target: torch.Tensor, mode: str, num_classes: int = 2, ignore_index: int = None):
     """
     Deterministic replacement for smp.metrics.get_stats using torch.bincount instead of torch.histc.
     Returns correct shape (batch_size, num_classes) for compatibility with iou_score.
@@ -28,11 +28,29 @@ def deterministic_get_stats(pred: torch.Tensor, target: torch.Tensor, mode: str,
             mask = target != ignore_index
         else:
             mask = torch.ones_like(target, dtype=torch.bool)
+ 
+        tp = []
+        fp = []
+        fn = []
+        tn = []
 
-        tp = ((pred == 1) & (target == 1) & mask).sum(dim=1, keepdim=True)
-        fp = ((pred == 1) & (target == 0) & mask).sum(dim=1, keepdim=True)
-        fn = ((pred == 0) & (target == 1) & mask).sum(dim=1, keepdim=True)
-        tn = ((pred == 0) & (target == 0) & mask).sum(dim=1, keepdim=True)
+        for i in range(batch_size):
+            p = pred[i][mask[i]]
+            t = target[i][mask[i]]
+
+            # For class 0 (background) and class 1 (object)
+            for c in [0, 1]:
+                tp.append(((p == c) & (t == c)).sum())
+                fp.append(((p == c) & (t != c)).sum())
+                fn.append(((p != c) & (t == c)).sum())
+                tn.append(((p != c) & (t != c)).sum())
+        
+         # Reshape to (batch_size, 2)
+        tp = torch.tensor(tp, dtype=torch.float32).view(batch_size, 2)
+        fp = torch.tensor(fp, dtype=torch.float32).view(batch_size, 2)
+        fn = torch.tensor(fn, dtype=torch.float32).view(batch_size, 2)
+        tn = torch.tensor(tn, dtype=torch.float32).view(batch_size, 2)
+
 
     elif mode == "multiclass":
         tp = []
