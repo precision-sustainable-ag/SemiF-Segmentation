@@ -61,3 +61,6 @@ lts_species_info: ${paths.tertiary_storage}/semifield-utils/species_information/
 
 # Synthetic data directory
 synthetic_project_dir: /home/mkutuga/SemiF-SyntheticPipeline/projects/${preprocess.use_synthetic.project_name}
+
+# Utils directory
+utils_dir: ${paths.persistent_dir}/src/utils

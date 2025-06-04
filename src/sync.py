@@ -7,6 +7,7 @@ version, it is automatically downloaded and updated.
 import hashlib
 import logging
 import shutil
+import subprocess
 from pathlib import Path
 
 import hydra
@@ -68,6 +69,7 @@ def main(cfg: DictConfig) -> None:
         }
     }
     try:
+        species_info_updated = False
         for name, paths in model_files.items():
             local = paths["local"]
             remote = paths["remote"]
@@ -79,6 +81,8 @@ def main(cfg: DictConfig) -> None:
             if not local.exists():
                 log.warning(f"Local file {local} does not exist. Downloading...")
                 update_file(local, remote)
+                if name == "species_info":
+                    species_info_updated = True
                 continue
             
             log.info(f"Comparing {name} files...")
@@ -87,6 +91,15 @@ def main(cfg: DictConfig) -> None:
             else:
                 log.warning(f"Local {name} is outdated or different from the remote version. Updating...")
                 update_file(local, remote)
+                if name == "species_info":
+                    species_info_updated = True
+        
+        # If species_info was updated, regenerate class_groupings.py
+        if species_info_updated:
+            log.info("species_info.json was updated. Regenerating class_groupings.py...")
+            # You can either call your function directly here, or run the script:
+            subprocess.run(["python", f"{cfg.paths.species_info_dir}/update_class_groupings.py", f"{cfg.paths.species_info_dir}/species_info.json", f"{cfg.paths.utils_dir}/class_groupings.py"], check=True)
+
     except Exception as e:
         log.error(f"An error occurred while syncing files: {e}")
         raise
