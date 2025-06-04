@@ -35,19 +35,25 @@ class MaskProcessor:
         # Initialize lookup table (assumes 8-bit image with values 0-255)
         lookup_table = np.zeros(256, dtype=np.uint8)
 
-        # Populate lookup table
+        # Gather all valid class_ids from the species map
+        valid_class_ids = set()
         for class_group, mapping in self.species_map.items():
             class_ids = mapping["class_ids"]
             new_value = mapping["values"]
             lookup_table[class_ids] = new_value
+            valid_class_ids.update(class_ids)
 
-        # Check and log if any invalid IDs (> 47) exist
-        if np.any(image > 47):
-            unique_invalid_values = np.unique(image[image > 47])
+        # Find all unique pixel values not in the valid set
+        image_unique = np.unique(image)
+        invalid_values = set(image_unique) - valid_class_ids
+
+        if invalid_values:
             log.warning(
-                f"Invalid class IDs found in {image_path}: {unique_invalid_values}. Skipping."
+                f"Invalid class IDs found in {image_path}: {sorted(list(invalid_values))}. "
+                f"These pixels will be set to unknown (27)."
             )
-            return None, True  # Skip processing
+
+            return None, True
 
         # Apply the lookup table for remapping
         remapped_image = lookup_table[image]

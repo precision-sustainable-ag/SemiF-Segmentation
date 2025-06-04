@@ -65,8 +65,16 @@ class DataSet:
         """Get image and mask files from the given directories."""
         log.info("Gathering images and masks.")
 
-        self.image_list = sorted(image_dir.glob("*.jpg"))
-        self.mask_list = sorted(mask_dir.glob("*.png"))
+        image_list = sorted(image_dir.glob("*.jpg"))
+        mask_list = sorted(mask_dir.glob("*.png"))
+        
+        # filter for image–mask pairs that exist in both directories 
+        image_stems = {img.stem for img in image_list}
+        mask_stems = {mask.stem for mask in mask_list}
+        matching_stems = image_stems & mask_stems
+
+        self.image_list = [img for img in image_list if img.stem in matching_stems]
+        self.mask_list = [mask for mask in mask_list if mask.stem in matching_stems]
         if model_testing.status:
             log.info("Using a subset of the data for quick and dirty model testing.")
             num_images = int(len(self.image_list) * model_testing.factor)
