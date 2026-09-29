@@ -89,7 +89,7 @@ def test_upload_protocol(tmp_path):
     assert [len(c["files"]) for c in bulk] == [2, 1]
     assert [name for name, _ in bulk[0]["files"]] == ["client_files[0]", "client_files[1]"]
     assert bulk[1]["files"][0][1][0] == "img2.jpg"
-    assert "Upload-Finish" in posts[-1]["headers"] and posts[-1]["data"]["image_quality"] == 95
+    assert "Upload-Finish" in posts[-1]["headers"] and posts[-1]["json"] == {"image_quality": 95, "sorting_method": "natural"}
     assert session.calls[-1]["url"].endswith("/api/requests/rq1")
 
 

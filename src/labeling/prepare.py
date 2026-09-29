@@ -4,10 +4,13 @@ Full frames (up to 13368x9520) are too big to annotate comfortably in the
 browser, so each image is downscaled until its longest side is at most
 `label.prepare.max_side`, into the run folder's images/. The pre-label mask
 is written at that same size into masks/ (0/255), as AgIR-CVToolkit's
-seg-infer wrote images/ and masks/ for its CVAT upload.
+seg-infer wrote images/ and masks/ for its CVAT upload. With
+`label.prelabel.source=masks` it's taken from an existing mask instead of the
+model (see `existing_mask_path`).
 """
 
 import logging
+from pathlib import Path
 
 import cv2
 from omegaconf import DictConfig
@@ -31,16 +34,29 @@ def main(cfg: DictConfig) -> dict | None:
             log.info("No fetched images waiting to be prepared in round %s.", lcfg.round)
             return None
 
-        prelabeler = None
-        if lcfg.prelabel.enable:
-            from src.labeling.prelabel import Prelabeler  # torch/smp only when needed
-
-            prelabeler = Prelabeler(lcfg.prelabel)
+        pcfg = lcfg.prelabel
+        use_masks = pcfg.enable and pcfg.source == "masks"
+        if pcfg.enable and pcfg.source not in ("model", "masks"):
+            raise ValueError(f"label.prelabel.source must be model or masks, not {pcfg.source!r}")
+        if use_masks and not pcfg.masks_root:
+            raise ValueError("label.prelabel.source=masks needs label.prelabel.masks_root")
+        if use_masks and pcfg.missing_mask not in ("model", "empty"):
+            raise ValueError(f"label.prelabel.missing_mask must be model or empty, not {pcfg.missing_mask!r}")
+        if pcfg.enable:
             run.masks.mkdir(parents=True, exist_ok=True)
+        prelabeler = None
+
+        def get_prelabeler():
+            nonlocal prelabeler
+            if prelabeler is None:
+                from src.labeling.prelabel import Prelabeler  # torch/smp only when needed
+
+                prelabeler = Prelabeler(pcfg)
+            return prelabeler
 
         max_side = int(lcfg.prepare.max_side)
         quality = int(lcfg.prepare.jpeg_quality)
-        counts = {"prepared": 0, "prelabeled": 0, "errors": 0}
+        counts = {"prepared": 0, "prelabeled": 0, "from_masks": 0, "no_mask": 0, "errors": 0}
         for item in tqdm(items, desc="prepare"):
             image_id = item["image_id"]
             try:
@@ -61,8 +77,22 @@ def main(cfg: DictConfig) -> dict | None:
                     "scale": size[0] / width,
                 }
 
-                if prelabeler is not None:
-                    mask = prelabeler.predict(image, size)
+                mask = None
+                if use_masks:
+                    mask_path = existing_mask_path(pcfg.masks_root, item["path"], image_id)
+                    if mask_path.exists():
+                        mask = load_existing_mask(mask_path, (width, height), size)
+                        counts["from_masks"] += 1
+                    else:
+                        counts["no_mask"] += 1
+                        log.warning("No mask at %s; %s", mask_path,
+                                    "using the model" if pcfg.missing_mask == "model" else "starts empty in CVAT")
+                        if pcfg.missing_mask == "model":
+                            mask = get_prelabeler().predict(image, size)
+                elif pcfg.enable:
+                    mask = get_prelabeler().predict(image, size)
+
+                if mask is not None:
                     prelabel_path = run.masks / f"{image_id}.png"
                     if not cv2.imwrite(str(prelabel_path), mask.astype("uint8") * 255):
                         raise RuntimeError(f"could not write {prelabel_path}")
@@ -76,3 +106,26 @@ def main(cfg: DictConfig) -> dict | None:
                 ledger.update(source, image_id, status="error", error=f"prepare: {exc}")
                 counts["errors"] += 1
     return counts
+
+
+def existing_mask_path(masks_root: str, source_path: str, image_id: str) -> Path:
+    """<masks_root>/<batch>/segmentations/<image_id>.png, where <batch> is the
+    folder above images/ in the source DB path (AgIR-CVToolkit's layout)."""
+    batch = Path(source_path).parent.parent.name
+    return Path(masks_root) / batch / "segmentations" / f"{image_id}.png"
+
+
+def load_existing_mask(path: Path, native_size: tuple[int, int], size: tuple[int, int]):
+    """Existing mask -> bool vegetation mask at the CVAT size. Masks may be
+    class-coded (any nonzero value is vegetation)."""
+    mask = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+    if mask is None:
+        raise RuntimeError(f"could not read {path}")
+    if mask.ndim == 3:
+        mask = mask.max(axis=2)
+    if (mask.shape[1], mask.shape[0]) != native_size:
+        raise RuntimeError(f"{path.name} is {mask.shape[1]}x{mask.shape[0]}, image is {native_size[0]}x{native_size[1]}")
+    mask = (mask > 0).astype("uint8")
+    if (mask.shape[1], mask.shape[0]) != size:
+        mask = cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST)
+    return mask.astype(bool)

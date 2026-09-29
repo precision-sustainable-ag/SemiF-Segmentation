@@ -45,6 +45,9 @@ class FakeCvat:
         self.tasks[task_id] = {"name": name, "segment_size": segment_size, "frames": [], "shapes": [], "tags": []}
         return {"id": task_id}
 
+    def delete_task(self, task_id):
+        del self.tasks[task_id]
+
     def get_task(self, task_id):
         return {"id": task_id, "name": self.tasks[task_id]["name"]}
 
@@ -251,3 +254,68 @@ def test_encode_mask_used_for_prelabels_roundtrips_through_pull():
     from src.labeling.cvat_masks import rasterize
     mask, _ = rasterize([{"type": "mask", "points": encode_mask(bitmap)}], 48, 64)
     assert np.array_equal(mask, bitmap)
+
+
+def test_prepare_uses_existing_masks(flow_cfg):
+    cfg = flow_cfg
+    masks_root = Path(cfg.paths.persistent_dir) / "segs"
+    OmegaConf.update(cfg, "label.prelabel.enable", True)
+    OmegaConf.update(cfg, "label.prelabel.source", "masks")
+    OmegaConf.update(cfg, "label.prelabel.masks_root", str(masks_root))
+    OmegaConf.update(cfg, "label.prelabel.missing_mask", "empty")
+    # Class-coded, native-resolution mask for IMG0 only (IMG0 is in batch B0).
+    seg = np.zeros((90, 120), np.uint8)
+    seg[0:30, 0:60] = 26
+    seg[60:90, 90:120] = 3
+    (masks_root / "B0/segmentations").mkdir(parents=True)
+    cv2.imwrite(str(masks_root / "B0/segmentations/IMG0.png"), seg)
+
+    select.main(cfg)
+    fetch.main(cfg)
+    counts = prepare.main(cfg)
+    assert counts["from_masks"] == 1 and counts["no_mask"] == 2 and counts["errors"] == 0
+
+    items = statuses(cfg)
+    assert {i["status"] for i in items.values()} == {"prepared"}
+    assert items["IMG1"]["prelabel_path"] is None and items["IMG2"]["prelabel_path"] is None
+    prelabel = cv2.imread(items["IMG0"]["prelabel_path"], cv2.IMREAD_GRAYSCALE)
+    assert prelabel.shape == (48, 64)
+    assert set(np.unique(prelabel)) == {0, 255}
+    assert prelabel[5, 5] == 255 and prelabel[45, 60] == 255 and prelabel[40, 5] == 0
+
+
+def test_push_cvat_splits_into_tasks_of_task_size(flow_cfg, monkeypatch):
+    cfg = flow_cfg
+    OmegaConf.update(cfg, "cvat.task_size", 2)
+    fake = FakeCvat()
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+
+    summary = push_cvat.main(cfg)
+    assert summary["images"] == 3 and [t["images"] for t in summary["tasks"]] == [2, 1]
+    assert [t["name"] for t in fake.tasks.values()] == ["vegetation_001_r_test", "vegetation_001_r_test-2"]
+    items = statuses(cfg)
+    assert {i["status"] for i in items.values()} == {"in_cvat"}
+    assert len({i["cvat_task_id"] for i in items.values()}) == 2
+    assert push_cvat.main(cfg) is None  # everything is already in CVAT
+
+
+def test_push_cvat_deletes_task_when_upload_fails(flow_cfg, monkeypatch):
+    cfg = flow_cfg
+    fake = FakeCvat()
+
+    def failing_upload(task_id, paths, **kwargs):
+        raise RuntimeError("HTTP 415")
+
+    fake.upload_images = failing_upload
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+
+    with pytest.raises(RuntimeError, match="415"):
+        push_cvat.main(cfg)
+    assert fake.tasks == {}
+    assert {i["status"] for i in statuses(cfg).values()} == {"prepared"}

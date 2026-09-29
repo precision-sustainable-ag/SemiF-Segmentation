@@ -3,7 +3,8 @@
 The task is named <project.name>_<project.subname>, as AgIR-CVToolkit's
 cvat_upload named them, goes into the configured project (created with the
 vegetation and exclude labels if it doesn't exist), and is split into jobs of
-`cvat.segment_size` images. The run folder's images/ are uploaded, and its
+`cvat.segment_size` images. With `cvat.task_size` set, the images are spread
+over several tasks of at most that many images each. The run folder's images/ are uploaded, and its
 masks/ (the pre-labels) as editable masks; that step is tracked per image, so
 a crash after the images are uploaded is recovered by re-running push_cvat.
 """
@@ -64,9 +65,16 @@ def main(cfg: DictConfig) -> dict | None:
         project, label_ids = ensure_project(client, ccfg)
 
         summary = {"project_id": project["id"], "images": 0}
-        if items:
-            task_name = f"{cfg.project.name}_{cfg.project.subname}"
-            summary.update(_create_task(client, ccfg, ledger, lcfg.round, task_name, source, project, items))
+        task_name = f"{cfg.project.name}_{cfg.project.subname}"
+        task_size = int(ccfg.task_size or len(items) or 1)
+        tasks = [
+            _create_task(client, ccfg, ledger, lcfg.round, task_name, source, project, items[start:start + task_size])
+            for start in range(0, len(items), task_size)
+        ]
+        if len(tasks) == 1:
+            summary.update(tasks[0])
+        elif tasks:
+            summary.update(images=sum(t["images"] for t in tasks), tasks=tasks)
 
         pending = [
             i for i in ledger.items(round_name=lcfg.round, status="in_cvat")
@@ -85,10 +93,19 @@ def _create_task(client, ccfg, ledger, round_name, task_name, source, project, i
     task_id = task["id"]
     log.info("Created CVAT task %s (id %s) for %d images", name, task_id, len(items))
 
-    client.upload_images(
-        task_id, [Path(i["cvat_image_path"]) for i in items],
-        image_quality=int(ccfg.image_quality), max_request_bytes=int(ccfg.upload_batch_mb * 2**20),
-    )
+    try:
+        client.upload_images(
+            task_id, [Path(i["cvat_image_path"]) for i in items],
+            image_quality=int(ccfg.image_quality), max_request_bytes=int(ccfg.upload_batch_mb * 2**20),
+        )
+    except Exception:
+        # The images stay `prepared`, so the next run makes a new task; don't leave this one behind.
+        log.error("Uploading to task %s failed; deleting it", task_id)
+        try:
+            client.delete_task(task_id)
+        except Exception:
+            log.exception("Could not delete CVAT task %s; delete it by hand", task_id)
+        raise
 
     meta = client.task_frames(task_id)
     start = meta.get("start_frame", 0)

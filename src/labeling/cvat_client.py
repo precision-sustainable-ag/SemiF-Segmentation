@@ -121,6 +121,9 @@ class CvatClient:
         spec = {"name": name, "project_id": project_id, "segment_size": segment_size}
         return self._json("POST", "tasks", json=spec, expect=(201,))
 
+    def delete_task(self, task_id: int) -> None:
+        self.request("DELETE", f"tasks/{task_id}", expect=(204,))
+
     def upload_images(self, task_id: int, paths: list[Path], *, image_quality: int,
                       max_request_bytes: int = MAX_REQUEST_BYTES) -> None:
         """CVAT's upload session: Upload-Start, one Upload-Multiple request per
@@ -131,9 +134,10 @@ class CvatClient:
             files = [(f"client_files[{i}]", (p.name, p.read_bytes(), "image/jpeg")) for i, p in enumerate(batch)]
             self.request("POST", endpoint, headers={"Upload-Multiple": ""}, files=files, expect=(200,))
             log.info("Uploaded %d images to task %s", len(batch), task_id)
+        # CVAT only accepts JSON or multipart here, not a form-encoded body.
         response = self.request(
             "POST", endpoint, headers={"Upload-Finish": ""},
-            data={"image_quality": image_quality, "sorting_method": "natural"}, expect=(202,),
+            json={"image_quality": image_quality, "sorting_method": "natural"}, expect=(202,),
         )
         rq_id = (response.json() if response.content else {}).get("rq_id")
         if rq_id:
