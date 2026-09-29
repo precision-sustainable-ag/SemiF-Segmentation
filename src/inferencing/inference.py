@@ -349,7 +349,7 @@ class InferenceRunner:
                   if cfg.inference.inference.explicit_img_dir.enable 
                   else Path(cfg.paths.project_inference_dir) / "data" / "images")
         self.metadata_dir = Path(cfg.paths.project_inference_dir) / "data" / "metadata"
-        self.output_dir = Path(cfg.paths.inference_output_dir) / "results"
+        self.output_dir = self._increment_inference_output_dir()
         self.project_preprocess_dir = Path(cfg.paths.project_preprocess_dir)
         self.output_mask_dir = self.output_dir / "masks"
 
@@ -361,6 +361,17 @@ class InferenceRunner:
         self.out_classes = cfg.model.out_classes
 
         self.bbox_crop = self.cfg.inference.inference.bbox_crop
+
+    def _increment_inference_output_dir(self):
+        """
+        Increment the output directory by appending a number if it already exists.
+        """
+        base_output_dir = Path(self.cfg.paths.inference_output_dir) / "run"
+        i = 2
+        while base_output_dir.exists():
+            base_output_dir = Path(self.cfg.paths.inference_output_dir) / f"run_{i}"
+            i += 1
+        return base_output_dir
 
     def _load_stats(self):
         stats_file = self.project_preprocess_dir / "data/data_stats/rgb_mean_std.json"

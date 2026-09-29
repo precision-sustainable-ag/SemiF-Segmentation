@@ -163,7 +163,7 @@ def plot_class_distributions(class_frequencies, title, group_name, output_dir=No
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     log.info("Starting data statistics calculation...")
-    data_stats_dir = Path(cfg.paths.project_mode_dir) / "data" / "data_stats"
+    data_stats_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "data_stats"
     split_dir = Path(cfg.paths.split_dir)
     train_image_dir = split_dir / "train" / "images"
     train_remapped_mask_dir = split_dir / "train" / "masks"
