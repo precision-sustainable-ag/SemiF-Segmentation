@@ -1,12 +1,12 @@
 tasks:
-  find_images: true
-  remove_nontargets: true # If true, only moves synthetic masks if use_synthetic is true
+  find_images: false
+  remove_nontargets: false # If true, only moves synthetic masks if use_synthetic is true
   grid_crop: true # successfully tested
   remap_masks: true # successfully tested
   train_val_test_split: true # successfully tested
   
   data_stats: true # successfully tested
-  viz_results: false
+  viz_results: true
 
 use_synthetic:
   enable: false
@@ -31,7 +31,7 @@ train_val_test_split:
   test_size: 0.1
   seed: 42
   use_concurrency: True
-  remove_cropped_data: True
+  remove_cropped_data: false
   
   model_testing: # quick and dirty way to generate a small dataset, not recommended for final results
     status: false
