@@ -24,9 +24,17 @@ Everything is a Hydra mode: `python main.py mode=<mode>`, with `sync`, `label`,
 
 ## Setup
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml`,
+`uv.lock`). torch and torchvision come from PyTorch's CUDA 12.6 index, which
+has x86_64 and aarch64 (GH200) wheels.
+
 ```bash
-conda env create -f environment.yaml   # or: pip install -r requirements.txt
+uv sync                          # creates .venv with the locked versions
+uv run python main.py mode=...   # or: source .venv/bin/activate
+uv run pytest
 ```
+
+Globus transfers also need the Globus CLI: `uv tool install globus-cli`.
 
 Credentials live in the gitignored `.keys/keys.yaml`:
 
@@ -170,7 +178,7 @@ and by the model version that made them. Each mode's Hydra logs are in
 ## Tests
 
 ```bash
-python -m pytest
+uv run pytest
 ```
 
 ## Archived code
