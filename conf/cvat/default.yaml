@@ -1,6 +1,6 @@
-# CVAT (self-hosted or app.cvat.ai), reached over REST and scoped to one organization.
-# url and org_id fall back to cvat.url / cvat.org_id in the credentials file.
-url: null
+# CVAT cloud, reached over REST and scoped to one organization.
+# org_id falls back to cvat.org_id in the credentials file (and url to cvat.url if set to null).
+url: https://app.cvat.ai
 org_id: null
 credentials_file: ${paths.persistent_dir}/.keys/keys.yaml   # cvat.username + cvat.password, or cvat.token
 

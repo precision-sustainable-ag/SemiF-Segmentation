@@ -30,7 +30,7 @@ Credentials live in the gitignored `.keys/keys.yaml`:
 
 ```yaml
 cvat:
-  url: https://app.cvat.ai     # or http://sunny.ece.ncsu.edu:8080
+  url: https://app.cvat.ai     # CVAT cloud
   org_id: 123                  # every request is scoped to this organization
   username: ...
   password: ...                # or `token: ...` for a personal access token
