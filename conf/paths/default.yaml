@@ -22,12 +22,13 @@ split_dir: ${paths.project_preprocess_dir}/data/tiles_${paths.tile_suffix}
 inference:
   checkpoints: ${paths.project_train_dir}/version_${inference.inference.version}/checkpoints
 
-# Labeling rounds (mode=label): the local label store
-labels_dir: ${paths.data_dir}/labels
-labels_db: ${paths.labels_dir}/labels.db                    # one row per image pulled into any round
-source_db_dir: ${paths.labels_dir}/source_db                # local snapshots of the source DBs
-label_images_dir: ${paths.labels_dir}/images                # full-resolution images, <source>/<image_id>.jpg
-label_cvat_images_dir: ${paths.labels_dir}/cvat_images      # downscaled copies uploaded to CVAT, <round>/<image_id>.jpg
-label_prelabels_dir: ${paths.labels_dir}/prelabels          # model masks at CVAT resolution, <round>/<image_id>.png (0/255)
-label_cvat_masks_dir: ${paths.labels_dir}/cvat_masks        # human masks at CVAT resolution, <source>/<image_id>.png (0/1)
-label_masks_dir: ${paths.labels_dir}/masks                  # human masks at native resolution, <source>/<image_id>.png (0/1)
+# Labeling rounds (mode=label) follow AgIR-CVToolkit's output format: one run
+# folder per round, outputs/runs/<project.name>/<project.subname>/ (the layout
+# is described in src/labeling/run_folder.py), next to the project's ledger.
+out_root: ${paths.persistent_dir}/outputs/runs
+project_runs_dir: ${paths.out_root}/${project.name}
+run_root: ${paths.project_runs_dir}/${project.subname}
+labels_db: ${paths.project_runs_dir}/labels.db    # one row per image in any of the project's rounds
+source_db_dir: ${paths.data_dir}/source_db        # local snapshots of the source DBs
+hydra_dirs:                                       # Hydra's output dir, for modes that don't use project_mode_dir
+  label: ${paths.run_root}/logs/hydra

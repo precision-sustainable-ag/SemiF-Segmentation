@@ -1,4 +1,5 @@
-"""build_dataset: the training set is every human-labeled image in labels.db.
+"""build_dataset: the training set is every human-labeled image in the
+project's labels.db (outputs/runs/<project.name>/labels.db).
 
 Each image gets a train/val/test split the first time it's seen here, and
 keeps it forever (it's stored in labels.db), so the test set never changes as

@@ -51,9 +51,12 @@ def test_existing_splits_never_change():
 
 
 def _labeled_ledger(cfg, n_images=6):
+    """A round's run folder with n_images labeled 150x100 images, their human
+    masks at CVAT resolution (120x80), and the last image excluded."""
     rng = np.random.default_rng(1)
-    image_dir = Path(cfg.paths.label_images_dir) / "field"
-    mask_dir = Path(cfg.paths.label_masks_dir) / "field"
+    run_root = Path(cfg.paths.project_runs_dir) / "r1"
+    image_dir = run_root / "field-batches/B/developed-images"
+    mask_dir = run_root / "cvat_downloads/vegetation_001_r1/masks"
     image_dir.mkdir(parents=True)
     mask_dir.mkdir(parents=True)
     with LabelLedger(cfg.paths.labels_db) as ledger:
@@ -62,8 +65,8 @@ def _labeled_ledger(cfg, n_images=6):
         ledger.add_items("r1", "field", rows)
         for n in range(n_images):
             image = rng.integers(0, 255, (100, 150, 3), dtype=np.uint8)
-            mask = np.zeros((100, 150), np.uint8)
-            mask[10:40, 20:70] = 1
+            mask = np.zeros((80, 120), np.uint8)
+            mask[8:32, 16:56] = 1
             cv2.imwrite(str(image_dir / f"IMG{n}.jpg"), image)
             cv2.imwrite(str(mask_dir / f"IMG{n}.png"), mask)
             ledger.update("field", f"IMG{n}", status="labeled", native_path=str(image_dir / f"IMG{n}.jpg"),
@@ -89,7 +92,7 @@ def test_build_tile_and_stats(make_cfg):
     images = sorted((split_dir / "train" / "images").glob("*.jpg"))
     masks = sorted((split_dir / "train" / "masks").glob("*.png"))
     assert images and [p.stem for p in images] == [p.stem for p in masks]
-    # 150x100 at scale 0.5 -> 75x50: x origins 0, 32, 43; y origins 0, 18 -> 6 tiles per image.
+    # 150x100 at scale 0.5 -> 75x50 (the 120x80 mask too): x origins 0, 32, 43; y origins 0, 18 -> 6 tiles per image.
     n_train = (manifest["split"] == "train").sum()
     assert len(images) == 6 * n_train
     tile_mask = cv2.imread(str(masks[0]), cv2.IMREAD_GRAYSCALE)
@@ -99,3 +102,26 @@ def test_build_tile_and_stats(make_cfg):
     stats_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "data_stats"
     assert set(OmegaConf.load(stats_dir / "rgb_mean_std.json")) == {"mean", "std"}
     assert (stats_dir / "class_distribution.png").exists()
+
+
+def test_tile_scales_cvat_masks_and_rejects_mismatched_ones(tmp_path):
+    image = np.zeros((100, 150, 3), np.uint8)
+    cv2.imwrite(str(tmp_path / "img.jpg"), image)
+    mask = np.zeros((40, 60), np.uint8)  # CVAT resolution: same aspect as the image
+    mask[:, 30:] = 1
+    cv2.imwrite(str(tmp_path / "mask.png"), mask)
+    cv2.imwrite(str(tmp_path / "portrait.png"), np.zeros((60, 40), np.uint8))
+    for split in ("train",):
+        for sub in ("images", "masks"):
+            (tmp_path / "tiles" / split / sub).mkdir(parents=True)
+    row = {"source": "field", "image_id": "img", "split": "train", "image_path": str(tmp_path / "img.jpg")}
+    args = (str(tmp_path / "tiles"), 1.0, 150, 0, 1.0, 0)
+
+    result = tile.tile_image({**row, "mask_path": str(tmp_path / "mask.png")}, *args)
+    assert result["tiles"] == 1
+    tile_mask = cv2.imread(str(next((tmp_path / "tiles/train/masks").glob("*.png"))), cv2.IMREAD_GRAYSCALE)
+    assert tile_mask.shape == (150, 150)  # padded from 150x100
+    assert tile_mask[:100, :75].max() == 0 and tile_mask[:100, 75:].min() == 1
+
+    result = tile.tile_image({**row, "mask_path": str(tmp_path / "portrait.png")}, *args)
+    assert "aspect ratio" in result["error"]

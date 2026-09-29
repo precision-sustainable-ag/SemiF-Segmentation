@@ -1,10 +1,12 @@
-import sys
-import types
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from src.labeling.transfer import CopyBackend, GlobusBackend, plan_fetch
+from src.labeling import transfer
+from src.labeling.run_folder import RunFolder
+from src.labeling.transfer import CopyBackend, GlobusBackend, plan_fetch, write_transfer_manifest
 
 
 def _touch(path: Path) -> Path:
@@ -27,114 +29,149 @@ def roots(tmp_path):
     ]
 
 
-def test_plan_fetch_resolves_roots(tmp_path, roots):
-    items = [
-        {"source": "semif", "image_id": "img1", "path": "semifield-developed-images/B1/images/img1.jpg"},
-        {"source": "semif", "image_id": "img9", "path": "semifield-developed-images/B9/images/img9.jpg"},
+@pytest.fixture
+def run(tmp_path):
+    return RunFolder(tmp_path / "outputs/runs/proj/r1")
+
+
+SEMIF_ITEMS = [
+    {"source": "semif", "image_id": "img1", "path": "semifield-developed-images/B1/images/img1.jpg"},
+    {"source": "semif", "image_id": "img9", "path": "semifield-developed-images/B9/images/img9.jpg"},
+]
+
+
+def test_plan_fetch_resolves_roots_and_keeps_their_layout(roots, run):
+    items = SEMIF_ITEMS + [
         {"source": "field", "image_id": "A1", "path": f"{roots[0]['local_path']}/field-batches/NC_1/developed-images/A1.jpg"},
         {"source": "field", "image_id": "A2", "path": f"{roots[0]['local_path']}/field-batches/NC_1/developed-images/A2.jpg"},
         {"source": "field", "image_id": "Z1", "path": "/elsewhere/Z1.jpg"},
     ]
-    jobs, unresolved = plan_fetch(items, roots, tmp_path / "images")
+    jobs, unresolved = plan_fetch(items, roots, run.root)
     by_id = {job.image_id: job for job in jobs}
 
     # Relative path: first mounted root that has the file.
     assert by_id["img1"].root == "lts2"
+    assert by_id["img1"].dest == run.root / "semifield-developed-images/B1/images/img1.jpg"
     # Not on any mount: falls back to the Globus-only root.
     assert by_id["img9"].root == "juno"
     assert by_id["img9"].rel_path == "semifield-developed-images/B9/images/img9.jpg"
-    # Absolute path under a root's local_path.
+    # Absolute path under a root's local_path: lands at its path below the root.
     assert by_id["A1"].root == "lts1"
-    assert by_id["A1"].rel_path == "field-batches/NC_1/developed-images/A1.jpg"
-    assert by_id["A1"].dest == tmp_path / "images/field/A1.jpg"
+    assert by_id["A1"].dest == run.root / "field-batches/NC_1/developed-images/A1.jpg"
     # Missing on its (mounted) root, and outside every root.
     assert sorted(item["image_id"] for item, _ in unresolved) == ["A2", "Z1"]
 
 
-def test_copy_backend(tmp_path, roots):
-    items = [{"source": "semif", "image_id": "img1", "path": "semifield-developed-images/B1/images/img1.jpg"}]
-    jobs, _ = plan_fetch(items, roots, tmp_path / "images")
-    CopyBackend(roots).run(jobs, label="test")
-    assert (tmp_path / "images/semif/img1.jpg").read_bytes() == b"jpg"
+def test_copy_backend(roots, run):
+    jobs, _ = plan_fetch(SEMIF_ITEMS[:1], roots, run.root)
+    backend = CopyBackend(roots, run)
+    records = backend.submit(jobs)
+    assert (run.root / "semifield-developed-images/B1/images/img1.jpg").read_bytes() == b"jpg"
+    assert records == [{"root": "lts2", "src_root": roots[1]["local_path"], "num_items": 1, "copied": 1}]
+
+    write_transfer_manifest(run, backend, records)
+    manifest = json.loads(run.transfer_manifest.read_text())
+    assert manifest["backend"] == "copy" and manifest["num_items"] == 1
 
 
 @pytest.fixture
-def fake_globus(monkeypatch):
-    """A stand-in globus_sdk module that records what GlobusBackend submits."""
-    record = {"transfers": []}
+def globus_cli(monkeypatch):
+    """Stands in for the globus CLI: records every command, answers like it."""
+    calls = []
+    state = {"logged_in": True, "task_status": "SUCCEEDED"}
 
-    class TransferData:
-        def __init__(self, **kwargs):
-            self.kwargs, self.items = kwargs, []
-            record["transfers"].append(self)
+    def run(cmd, capture_output, text):
+        calls.append(cmd)
+        args = cmd[1:]
+        if args[:2] == ["session", "show"]:
+            code = 0 if state["logged_in"] else 1
+            return subprocess.CompletedProcess(cmd, code, stdout="{}", stderr="" if code == 0 else "No session")
+        if args[0] == "transfer":
+            n = sum(1 for c in calls if c[1] == "transfer")
+            return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps({"task_id": f"task-{n}"}), stderr="")
+        if args[:2] == ["task", "show"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps({"status": state["task_status"]}), stderr="")
+        raise AssertionError(f"unexpected globus command {args}")
 
-        def add_item(self, src, dst):
-            self.items.append((src, dst))
-
-    class TransferClient:
-        def __init__(self, app):
-            record["app"] = app
-
-        def add_app_data_access_scope(self, ids):
-            record["scopes"] = sorted(ids)
-
-        def submit_transfer(self, data):
-            return {"task_id": f"task-{len(record['transfers'])}"}
-
-        def task_wait(self, task_id, timeout, polling_interval):
-            return True
-
-        def get_task(self, task_id):
-            return {"status": "SUCCEEDED"}
-
-        def task_skipped_errors(self, task_id):
-            return []
-
-    module = types.SimpleNamespace(
-        UserApp=lambda name, client_id, config: {"name": name, "client_id": client_id},
-        GlobusAppConfig=lambda **kwargs: kwargs,
-        TransferClient=TransferClient,
-        TransferData=TransferData,
-    )
-    monkeypatch.setitem(sys.modules, "globus_sdk", module)
-    return record
+    monkeypatch.setattr(transfer.subprocess, "run", run)
+    monkeypatch.setattr(transfer.shutil, "which", lambda cli: f"/usr/bin/{cli}")
+    return calls, state
 
 
 def _globus_cfg(**overrides):
     gcfg = {
-        "client_id": "cid",
-        "endpoints": {"ep1": {"id": "EP1", "data_access": True}, "juno": {"id": "JUNO", "data_access": True}},
-        "destination": {"id": "DEST", "path": "/~/labels/images", "data_access": False},
-        "sync_level": "checksum", "verify_checksum": True, "skip_source_errors": True,
-        "poll_seconds": 1, "timeout_hours": 1,
+        "cli": "globus",
+        "endpoints": {"ep1": "EP1", "juno": "JUNO"},
+        "destination": {"name": "sunny", "endpoint": "DEST", "dst_root": "/~/outputs/runs"},
+        "transfer": {"sync_level": "checksum", "verify_checksum": True, "skip_source_errors": True,
+                     "notify": "failed,inactive", "label_prefix": "semif-segmentation fetch",
+                     "poll_interval_s": 0, "timeout_s": 60},
     }
     gcfg.update(overrides)
     return gcfg
 
 
-def test_globus_backend_submits_one_transfer_per_root(tmp_path, roots, fake_globus):
-    items = [
-        {"source": "semif", "image_id": "img1", "path": "semifield-developed-images/B1/images/img1.jpg"},
-        {"source": "semif", "image_id": "img9", "path": "semifield-developed-images/B9/images/img9.jpg"},
-    ]
-    jobs, _ = plan_fetch(items, roots, tmp_path / "images")
-    task_ids = GlobusBackend(_globus_cfg(), roots, tmp_path / "images").run(jobs, label="semif-segmentation r1")
-
-    assert task_ids == {"lts2": "task-1", "juno": "task-2"}
-    assert fake_globus["scopes"] == ["EP1", "JUNO"]  # destination is GCP: no data_access consent
-    lts2, juno = fake_globus["transfers"]
-    assert (lts2.kwargs["source_endpoint"], lts2.kwargs["destination_endpoint"]) == ("EP1", "DEST")
-    assert lts2.items == [("/lts2/semifield-developed-images/B1/images/img1.jpg", "/~/labels/images/semif/img1.jpg")]
-    assert juno.items == [("/LTS/project/x/semifield-developed-images/B9/images/img9.jpg", "/~/labels/images/semif/img9.jpg")]
-    assert lts2.kwargs["sync_level"] == "checksum" and lts2.kwargs["verify_checksum"] is True
-    assert lts2.kwargs["skip_source_errors"] is True
+def _submitted(calls):
+    return [c[1:] for c in calls if c[1] == "transfer"]
 
 
-def test_globus_backend_config_errors(tmp_path, roots, fake_globus):
-    with pytest.raises(ValueError, match="client_id"):
-        GlobusBackend(_globus_cfg(client_id=None), roots, tmp_path)
-    items = [{"source": "semif", "image_id": "img1", "path": "semifield-developed-images/B1/images/img1.jpg"}]
-    jobs, _ = plan_fetch(items, roots, tmp_path / "images")
-    backend = GlobusBackend(_globus_cfg(endpoints={"ep1": {"id": None}}), roots, tmp_path / "images")
-    with pytest.raises(ValueError, match="endpoints.ep1.id"):
-        backend.run(jobs, label="x")
+def test_globus_backend_one_transfer_per_root(roots, run, globus_cli):
+    calls, _ = globus_cli
+    jobs, _ = plan_fetch(SEMIF_ITEMS, roots, run.root)
+    backend = GlobusBackend(_globus_cfg(), roots, run, "proj/r1")
+    records = backend.submit(jobs)
+
+    # Two source collections -> two transfers, each with its own batch file,
+    # landing under <dst_root>/<project>/<round>/ with the source layout.
+    assert [r["task_id"] for r in records] == ["task-1", "task-2"]
+    assert (run.root / "globus_batch_lts2.txt").read_text() == (
+        "/lts2/semifield-developed-images/B1/images/img1.jpg "
+        "/~/outputs/runs/proj/r1/semifield-developed-images/B1/images/img1.jpg\n"
+    )
+    assert (run.root / "globus_batch_juno.txt").read_text().startswith(
+        "/LTS/project/x/semifield-developed-images/B9/images/img9.jpg /~/outputs/runs/proj/r1/")
+    first, second = _submitted(calls)
+    assert first[:3] == ["transfer", "EP1", "DEST"] and second[:3] == ["transfer", "JUNO", "DEST"]
+    for flag in ("--skip-source-errors", "--verify-checksum"):
+        assert flag in first
+    assert first[first.index("--sync-level") + 1] == "checksum"
+    assert first[first.index("--notify") + 1] == "failed,inactive"
+    assert first[first.index("--label") + 1] == "semif-segmentation fetch dst=sunny run=proj/r1 root=lts2"
+
+    backend.wait(records)
+    assert {r["status"] for r in records} == {"SUCCEEDED"}
+    write_transfer_manifest(run, backend, records)
+    manifest = json.loads(run.transfer_manifest.read_text())
+    assert manifest["dst_root"] == "/~/outputs/runs/proj/r1/"
+    assert manifest["project_run_id"] == "proj/r1" and manifest["num_items"] == 2
+    assert [t["src_endpoint"] for t in manifest["transfers"]] == ["EP1", "JUNO"]
+
+
+def test_globus_backend_single_root_uses_globus_batch_txt(roots, run, globus_cli):
+    jobs, _ = plan_fetch(SEMIF_ITEMS[:1], roots, run.root)
+    records = GlobusBackend(_globus_cfg(), roots, run, "proj/r1").submit(jobs)
+    assert records[0]["batch_file"] == str(run.root / "globus_batch.txt")
+    assert (run.root / "globus_batch.txt").exists()
+
+
+def test_globus_backend_stops_waiting_at_timeout(roots, run, globus_cli):
+    _, state = globus_cli
+    state["task_status"] = "ACTIVE"
+    jobs, _ = plan_fetch(SEMIF_ITEMS[:1], roots, run.root)
+    backend = GlobusBackend(_globus_cfg(transfer={"poll_interval_s": 0, "timeout_s": 0}), roots, run, "proj/r1")
+    records = backend.submit(jobs)
+    backend.wait(records)
+    assert records[0]["status"] == "ACTIVE"
+
+
+def test_globus_backend_errors(roots, run, globus_cli):
+    calls, state = globus_cli
+    with pytest.raises(ValueError, match="destination"):
+        GlobusBackend(_globus_cfg(destination={"endpoint": None}), roots, run, "proj/r1")
+    jobs, _ = plan_fetch(SEMIF_ITEMS[:1], roots, run.root)
+    with pytest.raises(ValueError, match="endpoints.ep1"):
+        GlobusBackend(_globus_cfg(endpoints={"ep1": None}), roots, run, "proj/r1").submit(jobs)
+    state["logged_in"] = False
+    with pytest.raises(RuntimeError, match="globus login"):
+        GlobusBackend(_globus_cfg(), roots, run, "proj/r1").submit(jobs)
+    assert not _submitted(calls)

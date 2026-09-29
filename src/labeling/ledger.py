@@ -1,4 +1,6 @@
-"""labels.db: the local record of every image pulled into a labeling round.
+"""labels.db: the local record of every image pulled into one of a project's
+labeling rounds. It lives next to the rounds' run folders, in
+outputs/runs/<project.name>/labels.db (see run_folder.py).
 
 One row per (source, image_id). Each `mode=label` task only acts on rows in the
 status it expects and advances them, so re-running a task is safe:
@@ -38,21 +40,20 @@ CREATE TABLE IF NOT EXISTS items (
     location               TEXT,
     meta_json              TEXT,
     root                   TEXT,           -- sources.<source>.roots entry the image was fetched from
-    native_path            TEXT,           -- local full-resolution copy
+    native_path            TEXT,           -- local full-resolution copy, in the round's run folder
     native_width           INTEGER,
     native_height          INTEGER,
-    cvat_image_path        TEXT,           -- downscaled copy uploaded to CVAT
+    cvat_image_path        TEXT,           -- downscaled copy uploaded to CVAT (images/)
     cvat_width             INTEGER,
     cvat_height            INTEGER,
     scale                  REAL,           -- cvat_width / native_width
-    prelabel_path          TEXT,           -- model mask at CVAT resolution
+    prelabel_path          TEXT,           -- model mask at CVAT resolution (masks/)
     globus_task_id         TEXT,
     cvat_task_id           INTEGER,
     cvat_job_id            INTEGER,
     cvat_frame             INTEGER,
     cvat_prelabel_uploaded INTEGER NOT NULL DEFAULT 0,
-    cvat_mask_path         TEXT,           -- human mask at CVAT resolution
-    mask_path              TEXT,           -- human mask at native resolution
+    mask_path              TEXT,           -- human mask at CVAT resolution (cvat_downloads/<task>/masks/)
     changed_frac           REAL,           -- fraction of pixels the annotator changed vs the prelabel
     split                  TEXT,           -- train | val | test, assigned once by build_dataset
     error                  TEXT,
@@ -69,7 +70,7 @@ _UPDATABLE = {
     "native_path", "native_width", "native_height",
     "cvat_image_path", "cvat_width", "cvat_height", "scale", "prelabel_path",
     "globus_task_id", "cvat_task_id", "cvat_job_id", "cvat_frame", "cvat_prelabel_uploaded",
-    "cvat_mask_path", "mask_path", "changed_frac", "split", "error",
+    "mask_path", "changed_frac", "split", "error",
 }
 
 

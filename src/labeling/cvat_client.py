@@ -114,6 +114,9 @@ class CvatClient:
 
     # ---------- tasks ----------
 
+    def get_task(self, task_id: int) -> dict:
+        return self._json("GET", f"tasks/{task_id}")
+
     def create_task(self, name: str, project_id: int, segment_size: int) -> dict:
         spec = {"name": name, "project_id": project_id, "segment_size": segment_size}
         return self._json("POST", "tasks", json=spec, expect=(201,))

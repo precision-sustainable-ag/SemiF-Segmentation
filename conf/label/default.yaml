@@ -4,12 +4,13 @@
 # Each task only acts on images whose status says they're ready for it, so
 # re-running the whole task list is safe; pull_cvat only picks up jobs that
 # are finished in CVAT (see cvat.pull_when).
-round: ???                # unique round name, e.g. r001_field_covercrops
+round: ???                # unique round name, e.g. r001_field_covercrops; also its run folder,
+                          # outputs/runs/<project.name>/<round>/ (project.subname)
 source: field             # a key in conf/sources: field | semif
 
 tasks:
   select: true            # pick images from the source DB
-  fetch: true             # move them here (transfer.backend: globus | copy)
+  fetch: true             # move them into the run folder (transfer.backend: globus | copy)
   prepare: true           # downscale for CVAT + model pre-labels
   push_cvat: true         # create the CVAT task (jobs of cvat.segment_size images)
   pull_cvat: true         # read finished jobs back as masks

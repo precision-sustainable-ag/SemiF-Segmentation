@@ -2,7 +2,8 @@
 
 Every image is first resized to `preprocess.tile.scale` of its native size
 (inference uses the same factor, so the model sees plants at the scale it
-trained on), then covered completely with tile_size tiles: the last tile in
+trained on), and its mask, stored at CVAT resolution, to the same size. Then
+it's covered completely with tile_size tiles: the last tile in
 each row/column is aligned to the image edge instead of being dropped.
 Background-only tiles are kept at `keep_background` rate so the model also
 learns bare soil and residue. Output: paths.split_dir/{train,val,test}/{images,masks}.
@@ -31,12 +32,16 @@ def tile_image(row: dict, out_dir: str, scale: float, tile_size: int, overlap: i
     mask = cv2.imread(row["mask_path"], cv2.IMREAD_GRAYSCALE)
     if image is None or mask is None:
         return {"image_id": row["image_id"], "error": "could not read image or mask"}
-    if image.shape[:2] != mask.shape:
-        return {"image_id": row["image_id"], "error": f"image {image.shape[:2]} != mask {mask.shape}"}
+    # Masks are saved at the resolution they were annotated in CVAT, a
+    # downscaled copy of the image: same aspect ratio, fewer pixels.
+    height, width = image.shape[:2]
+    if abs(mask.shape[1] / mask.shape[0] - width / height) > 0.02 * width / height:
+        return {"image_id": row["image_id"], "error": f"image {image.shape[:2]} and mask {mask.shape} differ in aspect ratio"}
 
-    if scale != 1.0:
-        size = (max(1, round(image.shape[1] * scale)), max(1, round(image.shape[0] * scale)))
+    size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    if size != (width, height):
         image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+    if (mask.shape[1], mask.shape[0]) != size:
         mask = cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST)
 
     # Images smaller than a tile are padded; padded pixels are background.

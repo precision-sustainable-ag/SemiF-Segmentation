@@ -8,6 +8,7 @@
 # DB sees it (local_path, when mounted on this machine) to a Globus collection
 # (endpoint, a key in transfer.globus.endpoints) and the same directory's path on
 # that collection (endpoint_path). Only the Globus backend needs endpoint/endpoint_path.
+# Fetched files keep their path below the root inside the round's run folder.
 
 semif:
   db: /mnt/research-projects/s/screberg/longterm_images2/semifield-database/AgIR_DB_v2_0_202609.db

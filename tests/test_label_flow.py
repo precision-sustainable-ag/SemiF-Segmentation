@@ -1,22 +1,29 @@
 """select -> fetch -> prepare -> push_cvat -> (annotate) -> pull_cvat, with a
 tiny field DB, the copy transfer backend, and an in-memory stand-in for CVAT."""
 
+import json
 import sqlite3
 from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 import pytest
+import yaml
 from omegaconf import OmegaConf
 
+from src import label
 from src.labeling import fetch, prepare, pull_cvat, push_cvat, select
 from src.labeling.cvat_client import CvatClient
 from src.labeling.cvat_masks import encode_mask
 from src.labeling.ledger import LabelLedger
+from src.labeling.run_folder import RunFolder
 
 
 class FakeCvat:
     """Just enough of CvatClient for push_cvat and pull_cvat."""
+
+    base = "https://cvat.test"
 
     def __init__(self):
         self.project = None
@@ -37,6 +44,9 @@ class FakeCvat:
         task_id = 100 + len(self.tasks)
         self.tasks[task_id] = {"name": name, "segment_size": segment_size, "frames": [], "shapes": [], "tags": []}
         return {"id": task_id}
+
+    def get_task(self, task_id):
+        return {"id": task_id, "name": self.tasks[task_id]["name"]}
 
     def upload_images(self, task_id, paths, *, image_quality, max_request_bytes):
         # CVAT orders frames by name with sorting_method=natural.
@@ -115,22 +125,37 @@ def statuses(cfg):
 
 def test_round_end_to_end(flow_cfg, monkeypatch):
     cfg = flow_cfg
+    run = RunFolder(cfg.paths.run_root)
+    assert run.root == Path(cfg.paths.persistent_dir) / "outputs/runs/vegetation_001/r_test"
     select.main(cfg)
     assert {i["status"] for i in statuses(cfg).values()} == {"selected"}
     assert len(statuses(cfg)) == 3
-    select.main(cfg)  # round is full: no-op
-    assert len(statuses(cfg)) == 3
-    # select read a local snapshot, not the DB itself.
+    # select read a local snapshot, not the DB itself, and wrote agir-cv query's files.
     assert (Path(cfg.paths.source_db_dir) / "field_exploration.db").exists()
+    query = pd.read_csv(run.query_csv)
+    assert sorted(query["image_id"]) == ["IMG0", "IMG1", "IMG2"]
+    assert query["image_path"].str.endswith(".jpg").all() and "meta" not in query
+    spec = json.loads(run.query_spec.read_text())
+    assert spec["query_metadata"]["run_id"] == "vegetation_001/r_test"
+    assert spec["query_parameters"]["sample"]["parsed"]["strategy"] == "balanced"
+    assert spec["execution"]["rows_returned"] == 3
+
+    select.main(cfg)  # every match is already in the project: nothing new
+    assert len(statuses(cfg)) == 3
+    assert len(pd.read_csv(run.query_csv)) == 3
+    assert json.loads(run.query_spec.read_text())["execution"]["rows_already_in_project"] == 3
 
     fetch.main(cfg)
     items = statuses(cfg)
     assert {i["status"] for i in items.values()} == {"fetched"}
-    assert Path(items["IMG0"]["native_path"]) == Path(cfg.paths.label_images_dir) / "field/IMG0.jpg"
+    # Fetched files keep their path below the source root, inside the run folder.
+    assert Path(items["IMG0"]["native_path"]) == run.root / "field-batches/B0/developed-images/IMG0.jpg"
+    assert json.loads(run.transfer_manifest.read_text())["num_items"] == 3
 
     prepare.main(cfg)
     items = statuses(cfg)
     assert items["IMG0"]["native_width"] == 120 and items["IMG0"]["cvat_width"] == 64
+    assert Path(items["IMG0"]["cvat_image_path"]) == run.images / "IMG0.jpg"
     assert cv2.imread(items["IMG0"]["cvat_image_path"]).shape[:2] == (48, 64)
 
     fake = FakeCvat()
@@ -138,17 +163,18 @@ def test_round_end_to_end(flow_cfg, monkeypatch):
     # Pre-labels are normally written by prepare; add one to check it's uploaded.
     prelabel = np.zeros((48, 64), np.uint8)
     prelabel[10:20, 10:30] = 255
-    prelabel_path = Path(cfg.paths.label_prelabels_dir) / "r_test/IMG0.png"
+    prelabel_path = run.masks / "IMG0.png"
     prelabel_path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(prelabel_path), prelabel)
     with LabelLedger(cfg.paths.labels_db) as ledger:
         ledger.update("field", "IMG0", prelabel_path=str(prelabel_path))
 
-    push_cvat.main(cfg)
+    summary = push_cvat.main(cfg)
     items = statuses(cfg)
     assert {i["status"] for i in items.values()} == {"in_cvat"}
     task = fake.tasks[items["IMG0"]["cvat_task_id"]]
-    assert task["name"] == "r_test" and len(task["frames"]) == 3
+    assert task["name"] == "vegetation_001_r_test" and len(task["frames"]) == 3
+    assert summary["task_url"] == f"https://cvat.test/tasks/{items['IMG0']['cvat_task_id']}"
     assert [items[f"IMG{n}"]["cvat_frame"] for n in range(3)] == [0, 1, 2]
     assert items["IMG0"]["cvat_prelabel_uploaded"] == 1
     assert len(task["shapes"]) == 1 and task["shapes"][0]["frame"] == 0
@@ -169,15 +195,30 @@ def test_round_end_to_end(flow_cfg, monkeypatch):
     pull_cvat.main(cfg)
     items = statuses(cfg)
     assert [items[f"IMG{n}"]["status"] for n in range(3)] == ["labeled", "labeled", "in_cvat"]
-    native = cv2.imread(items["IMG0"]["mask_path"], cv2.IMREAD_GRAYSCALE)
-    assert native.shape == (90, 120) and set(np.unique(native)) <= {0, 1}
+    downloads = run.cvat_downloads / "vegetation_001_r_test"
+    assert Path(items["IMG0"]["mask_path"]) == downloads / "masks/IMG0.png"
+    assert (downloads / f"annotations/job_{first_job['id']}.json").exists()
+    mask = cv2.imread(items["IMG0"]["mask_path"], cv2.IMREAD_GRAYSCALE)
+    assert mask.shape == (48, 64) and set(np.unique(mask)) <= {0, 1}  # CVAT resolution
     assert items["IMG0"]["changed_frac"] == 0.0
-    cvat_mask = cv2.imread(items["IMG1"]["cvat_mask_path"], cv2.IMREAD_GRAYSCALE)
-    assert cvat_mask[:24, :32].all() and cvat_mask.sum() == 24 * 32
+    mask = cv2.imread(items["IMG1"]["mask_path"], cv2.IMREAD_GRAYSCALE)
+    assert mask[:24, :32].all() and mask.sum() == 24 * 32
 
     fake.job_state[second_job["id"]] = "completed"
     pull_cvat.main(cfg)
     assert statuses(cfg)["IMG2"]["status"] == "excluded"
+
+    # A full `mode=label` run (nothing left to do) writes the rest of the run folder.
+    label.main(cfg)
+    saved = yaml.safe_load(run.cfg.read_text())
+    assert saved["runtime"]["run_id"] == "vegetation_001/r_test" and saved["runtime"]["stage"] == "label"
+    assert saved["paths"]["run_root"] == str(run.root) and saved["label"]["round"] == "r_test"
+    assert list(run.logs.glob("*.log"))
+    manifest = pd.read_csv(run.manifest)
+    assert dict(zip(manifest["image_id"], manifest["status"])) == {"IMG0": "labeled", "IMG1": "labeled", "IMG2": "excluded"}
+    metrics = json.loads(run.metrics.read_text())
+    assert metrics["run_id"] == "vegetation_001/r_test"
+    assert metrics["status_counts"] == {"labeled": 2, "excluded": 1}
 
 
 def test_prelabeler_tiles_and_loads_lightning_checkpoint(tmp_path):

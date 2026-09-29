@@ -71,6 +71,7 @@ class SemifSource:
     """AgIR_DB_v2: one flat `semif` table with one row per cutout."""
 
     name = "semif"
+    table = "semif"
     meta_columns = ("state", "season", "bbot_version", "species")
 
     def __init__(self, db_path: str | Path):
@@ -106,6 +107,7 @@ class FieldSource:
     processed JPG on NFS in file_locations."""
 
     name = "field"
+    table = "file_status JOIN file_locations"
     meta_columns = (
         "plant_type", "species", "growth_stage", "crop_or_fallow",
         "cover_crop_family", "flower_fruit_or_seeds",

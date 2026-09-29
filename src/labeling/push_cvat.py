@@ -1,10 +1,11 @@
 """push_cvat: create a CVAT task for the round's prepared images.
 
-The task goes into the configured project (created with the vegetation and
-exclude labels if it doesn't exist) and is split into jobs of
-`cvat.segment_size` images. Pre-labels are uploaded as editable masks; that
-step is tracked per image, so a crash after the images are uploaded is
-recovered by simply re-running push_cvat.
+The task is named <project.name>_<project.subname>, as AgIR-CVToolkit's
+cvat_upload named them, goes into the configured project (created with the
+vegetation and exclude labels if it doesn't exist), and is split into jobs of
+`cvat.segment_size` images. The run folder's images/ are uploaded, and its
+masks/ (the pre-labels) as editable masks; that step is tracked per image, so
+a crash after the images are uploaded is recovered by re-running push_cvat.
 """
 
 import json
@@ -45,7 +46,7 @@ def ensure_project(client: CvatClient, ccfg) -> tuple[dict, dict[str, int]]:
     return project, label_ids
 
 
-def main(cfg: DictConfig) -> None:
+def main(cfg: DictConfig) -> dict | None:
     lcfg, ccfg = cfg.label, cfg.cvat
     source = lcfg.source
 
@@ -57,25 +58,29 @@ def main(cfg: DictConfig) -> None:
         ]
         if not items and not pending_prelabels:
             log.info("Nothing to push to CVAT for round %s.", lcfg.round)
-            return
+            return None
 
         client = CvatClient.from_config(ccfg)
         project, label_ids = ensure_project(client, ccfg)
 
+        summary = {"project_id": project["id"], "images": 0}
         if items:
-            _create_task(client, ccfg, ledger, lcfg.round, source, project, items)
+            task_name = f"{cfg.project.name}_{cfg.project.subname}"
+            summary.update(_create_task(client, ccfg, ledger, lcfg.round, task_name, source, project, items))
 
         pending = [
             i for i in ledger.items(round_name=lcfg.round, status="in_cvat")
             if i["prelabel_path"] and not i["cvat_prelabel_uploaded"]
         ]
         if pending:
-            _upload_prelabels(client, ledger, source, pending, label_ids[ccfg.vegetation_label.name])
+            summary["prelabels_uploaded"] = _upload_prelabels(
+                client, ledger, source, pending, label_ids[ccfg.vegetation_label.name])
+    return summary
 
 
-def _create_task(client, ccfg, ledger, round_name, source, project, items) -> None:
+def _create_task(client, ccfg, ledger, round_name, task_name, source, project, items) -> dict:
     previous_tasks = {i["cvat_task_id"] for i in ledger.items(round_name=round_name) if i["cvat_task_id"]}
-    name = round_name if not previous_tasks else f"{round_name}-{len(previous_tasks) + 1}"
+    name = task_name if not previous_tasks else f"{task_name}-{len(previous_tasks) + 1}"
     task = client.create_task(name, project["id"], int(ccfg.segment_size))
     task_id = task["id"]
     log.info("Created CVAT task %s (id %s) for %d images", name, task_id, len(items))
@@ -103,6 +108,8 @@ def _create_task(client, ccfg, ledger, round_name, source, project, items) -> No
 
     if ccfg.assignees:
         _assign_jobs(client, jobs, list(ccfg.assignees))
+    return {"task_id": task_id, "task_name": name, "task_url": f"{client.base}/tasks/{task_id}",
+            "images": len(items), "jobs": len(jobs)}
 
 
 def _assign_jobs(client, jobs, usernames) -> None:
@@ -120,11 +127,12 @@ def _assign_jobs(client, jobs, usernames) -> None:
             log.info("Assigned job %s to %s", job["id"], username)
 
 
-def _upload_prelabels(client, ledger, source, items, label_id) -> None:
+def _upload_prelabels(client, ledger, source, items, label_id) -> int:
     by_task = defaultdict(list)
     for item in items:
         by_task[item["cvat_task_id"]].append(item)
 
+    uploaded = 0
     for task_id, task_items in by_task.items():
         meta = client.task_frames(task_id)
         start = meta.get("start_frame", 0)
@@ -144,16 +152,18 @@ def _upload_prelabels(client, ledger, source, items, label_id) -> None:
                     n_points += len(shape["points"])
             batch_items.append(item)
             if n_points >= _MAX_ANNOTATION_POINTS:
-                _send(client, ledger, source, task_id, shapes, batch_items)
+                uploaded += _send(client, ledger, source, task_id, shapes, batch_items)
                 shapes, batch_items, n_points = [], [], 0
         if batch_items:
-            _send(client, ledger, source, task_id, shapes, batch_items)
+            uploaded += _send(client, ledger, source, task_id, shapes, batch_items)
+    return uploaded
 
 
-def _send(client, ledger, source, task_id, shapes, items) -> None:
+def _send(client, ledger, source, task_id, shapes, items) -> int:
     if shapes:
         client.add_task_annotations(task_id, shapes)
     for item in items:
         ledger.update(source, item["image_id"], cvat_prelabel_uploaded=1)
     log.info("Uploaded %d pre-label masks to task %s (%.1f MB of points)",
              len(shapes), task_id, len(json.dumps(shapes)) / 1e6 if shapes else 0.0)
+    return len(shapes)
