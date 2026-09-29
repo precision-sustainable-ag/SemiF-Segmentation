@@ -64,3 +64,13 @@ synthetic_project_dir: /home/mkutuga/SemiF-SyntheticPipeline/projects/${preproce
 
 # Utils directory
 utils_dir: ${paths.persistent_dir}/src/utils
+
+# Labeling rounds (mode=label): the local label store
+labels_dir: ${paths.data_dir}/labels
+labels_db: ${paths.labels_dir}/labels.db                    # one row per image pulled into any round
+source_db_dir: ${paths.labels_dir}/source_db                # local snapshots of the source DBs
+label_images_dir: ${paths.labels_dir}/images                # full-resolution images, <source>/<image_id>.jpg
+label_cvat_images_dir: ${paths.labels_dir}/cvat_images      # downscaled copies uploaded to CVAT, <round>/<image_id>.jpg
+label_prelabels_dir: ${paths.labels_dir}/prelabels          # model masks at CVAT resolution, <round>/<image_id>.png (0/255)
+label_cvat_masks_dir: ${paths.labels_dir}/cvat_masks        # human masks at CVAT resolution, <source>/<image_id>.png (0/1)
+label_masks_dir: ${paths.labels_dir}/masks                  # human masks at native resolution, <source>/<image_id>.png (0/1)

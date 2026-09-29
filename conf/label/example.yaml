@@ -1,0 +1,14 @@
+# Example round: python main.py mode=label label=example
+# Only the keys that differ from label/default.yaml need to be listed.
+defaults:
+  - default
+  - _self_
+
+round: r000_example_field
+source: field
+
+select:
+  n_images: 20
+  balance_by: [location]
+  filters:
+    plant_type: COVERCROPS

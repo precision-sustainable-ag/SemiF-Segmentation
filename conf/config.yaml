@@ -6,13 +6,17 @@ defaults:
   - model: deeplabv3plus         # Model config (segformer, deeplabv3plus)
   - train: default         # Train config
   - inference: default      # Inference config
-  
+  - sources: default        # Source DBs for labeling rounds (AgIR v2, field_exploration)
+  - transfer: default       # How label fetch moves images (Globus endpoints and paths)
+  - cvat: default           # CVAT server, organization, and project
+  - label: default          # Labeling round (select one with label=<round>)
+
   - _self_                   # Ensures overriding behavior
 
 project:
   name: vegetation_001 #test_gh_actions_001 #test_gh_actions_001, hairy_vetch_001
 
-mode: ??? # required argument for command line. Either sync, query, preprocess, train, or inference
+mode: ??? # required argument for command line. Either sync, query, label, preprocess, train, or inference
 
 job_now_date: &nowdir ${now:%Y-%m-%d}
 job_now_time: &nowtime ${now:%H:%M:%S}

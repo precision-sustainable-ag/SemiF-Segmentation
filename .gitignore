@@ -25,3 +25,4 @@ ENV/
 env.bak/
 venv.bak/
 .keys
+.pytest_cache/

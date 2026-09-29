@@ -1,0 +1,22 @@
+# How label fetch moves full-resolution images to this machine.
+backend: globus           # globus | copy (plain copy from mounted roots; for testing or before Globus is set up)
+
+globus:
+  client_id: null         # native-app client ID; register one at https://app.globus.org/settings/developers
+  # Collections referenced by conf/sources roots. data_access: true for
+  # Globus Connect Server v5 mapped collections (they need an extra consent).
+  endpoints:
+    ncsu_screberg: {id: null, data_access: true}
+    ncsu_raatwell: {id: null, data_access: true}
+    juno: {id: null, data_access: true}
+  # Where fetched images land: the collection serving paths.label_images_dir,
+  # and that directory's path as the collection sees it.
+  destination:
+    id: 24630c20-fbcb-11ef-9793-0e26ca329435   # Globus Connect Personal on sunny; shares ~/ only and must be running
+    path: ${paths.label_images_dir}
+    data_access: false
+  sync_level: checksum
+  verify_checksum: true
+  skip_source_errors: true  # one missing file doesn't fail the transfer; fetch marks that image as an error
+  poll_seconds: 60
+  timeout_hours: 48
