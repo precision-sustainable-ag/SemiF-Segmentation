@@ -1,14 +1,5 @@
 tasks:
-  get_dataset: false
   inference: true
-
-get_dataset:
-  query: true
-  collect_paths: true
-  sample_size: 10
-  images: true
-  metadata: true
-  masks: false
 
 inference:
   explicit_img_dir:
@@ -19,7 +10,7 @@ inference:
   inference_subname: non_green_Field_sample
   # inference_subname: hairy_vetch_pm3d
   version: 1 # Uses cfg.project.name to find the model
-  rescale_factor: 0.50
+  rescale_factor: ${preprocess.tile.scale} # match the scale the model was trained at
   threshold: 0.95
   use_normalization: true
   cuda_visible_devices: [9]

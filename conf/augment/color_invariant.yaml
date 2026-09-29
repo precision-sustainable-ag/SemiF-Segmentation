@@ -1,5 +1,5 @@
 train:
-  img_hw: ["${preprocess.grid_crop.crop_height}", "${preprocess.grid_crop.crop_width}"]
+  img_hw: ["${preprocess.tile.tile_size}", "${preprocess.tile.tile_size}"]
   # img_hw: [512, 512]
 
   geometrics_transforms:

@@ -4,9 +4,11 @@ from pathlib import Path
 from datetime import datetime
 from omegaconf import DictConfig, OmegaConf
 import numpy as np
+import pandas as pd
 import json
 import torch
 import logging
+import albumentations as A
 from torch.utils.data import DataLoader
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger
@@ -36,13 +38,22 @@ def load_stats(stats_file: Path):
             return np.array(data['mean']), np.array(data['std'])
     return None, None
 
+def predict_mask(logits: torch.Tensor, out_classes: int, threshold: float = 0.5) -> torch.Tensor:
+    """(B, H, W) class indices from model logits: sigmoid threshold for binary
+    (single-channel) models, argmax otherwise."""
+    if out_classes == 1:
+        return (torch.sigmoid(logits[:, 0]) > threshold).long()
+    return logits.argmax(dim=1)
+
 @rank_zero_only
-def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
+def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict], test_result: list[dict] | None):
     """
-    Log run information to the logger for github actions.
+    Log run information (metrics, and which labels the model was trained on).
     """
     valid_per_image_iou = val_result[0]["valid_per_image_iou"]
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
+    manifest_path = Path(cfg.paths.dataset_manifest)
+    manifest = pd.read_csv(manifest_path) if manifest_path.exists() else None
     run_info = {
         "project_name": cfg.project.name,
         "timestamp": datetime.now().isoformat(),
@@ -55,17 +66,23 @@ def log_run_info(logger: CSVLogger, cfg: DictConfig, val_result: list[dict]):
         "num_GPUs": len(list(cfg.train.cuda_visible_devices)),
         "num_epochs": cfg.train.epochs,
         "batch_size": cfg.train.batch_size,
-        "image_size": f"{cfg.preprocess.grid_crop.crop_height}x{cfg.preprocess.grid_crop.crop_width}",
+        "image_size": f"{cfg.preprocess.tile.tile_size}x{cfg.preprocess.tile.tile_size}",
+        "train_scale": cfg.preprocess.tile.scale,
         "training_images": len(list(Path(cfg.paths.split_dir, "train", "images").glob("*.jpg"))),
         "validation_images": len(list(Path(cfg.paths.split_dir, "val", "images").glob("*.jpg"))),
+        "test_images": len(list(Path(cfg.paths.split_dir, "test", "images").glob("*.jpg"))),
+        "labeled_images_per_split": manifest.groupby("split").size().to_dict() if manifest is not None else None,
+        "label_rounds": sorted(manifest["round"].unique().tolist()) if manifest is not None else None,
         "valid_dataset_iou": valid_dataset_iou,
         "valid_per_image_iou": valid_per_image_iou,
+        "test_dataset_iou": test_result[0]["test_dataset_iou"] if test_result else None,
+        "test_per_image_iou": test_result[0]["test_per_image_iou"] if test_result else None,
         }
 
-    Path("logs").mkdir(exist_ok=True)
-    with open("logs/run_info.json", "w") as f:
+    run_info_path = Path(logger.log_dir) / "run_info.json"
+    with open(run_info_path, "w") as f:
         json.dump(run_info, f, indent=4)
-    print(f"Run info saved to: logs/run_info.json")
+    print(f"Run info saved to: {run_info_path}")
 
 @hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
@@ -180,15 +197,30 @@ def main(cfg: DictConfig):
 
     trainer.fit(model, train_loader, val_loader)
     
-    # Validate
-    val_result = trainer.validate(model, val_loader, verbose=False)
+    # Validate and test the best checkpoint (the model saved below and used for inference)
+    val_result = trainer.validate(model, val_loader, ckpt_path="best", verbose=False)
     valid_per_image_iou = val_result[0]["valid_per_image_iou"]
     valid_dataset_iou = val_result[0]["valid_dataset_iou"]
     print(f"Validation IoU per images: {valid_per_image_iou}")
     print(f"Validation dataset IoU: {valid_dataset_iou}")
-    
-    try: 
-        log_run_info(logger, cfg, val_result)
+
+    # The test split never influences training or checkpoint selection
+    test_result = None
+    if len(test_dataset):
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=cfg.train.batch_size,
+            shuffle=False,
+            num_workers=cfg.train.dataset.workers
+            )
+        test_result = trainer.test(model, test_loader, ckpt_path="best", verbose=False)
+        print(f"Test IoU per images: {test_result[0]['test_per_image_iou']}")
+        print(f"Test dataset IoU: {test_result[0]['test_dataset_iou']}")
+    else:
+        log.warning("No test tiles found; skipping the held-out test evaluation.")
+
+    try:
+        log_run_info(logger, cfg, val_result, test_result)
     except Exception as e:
         print(f"Error logging run info: {e}")
 
@@ -205,22 +237,15 @@ def main(cfg: DictConfig):
         print(f"Best model being saved to: {Path(model_dir, 'best_model')}.pth")
         best_model.save_model(model_dir, "best_model")
 
-    # === Sample Inference on 5 Validation Images === #
+    # === Sample Inference on a Test Tile === #
 
-    class_colors = {
-        0: [0, 0, 0],          # background -> black
-        1: [255, 182, 193],        # monocot -> green
-        2: [173, 216, 230],        # dicot -> red
-    }
+    class_labels = dict(enumerate(cfg.train.class_names))
+    palette = [[0, 0, 0], [34, 139, 34], [173, 216, 230], [255, 160, 122], [238, 130, 238]]
+    class_colors = {idx: palette[idx % len(palette)] for idx in class_labels}
+    out_classes = cfg.model.out_classes
 
-    class_labels = {
-        0: "Background/soil",
-        1: "Grass",
-        2: "Hairy vetch",
-    }
-
-    if is_rank_zero:
-        log.info("Running sample inference on validation images...")
+    if is_rank_zero and len(test_dataset):
+        log.info("Running sample inference on a test tile...")
 
         best_model.eval()  # set model to eval mode
 
@@ -235,7 +260,7 @@ def main(cfg: DictConfig):
 
         with torch.no_grad():
             output = best_model(image)
-            mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
+            mask_pred = predict_mask(output, out_classes).squeeze(0).cpu().numpy()
 
         # Save side-by-side plot
         output_path = output_dir / f"test_prediction.png"
@@ -244,19 +269,28 @@ def main(cfg: DictConfig):
 
         log.info(f"Saved sample predictions to {output_dir}")
 
-        # === Sample Inference on Unlabeled Images === #
-        log.info("Running inference on sample unlabeled images...")
+    # === Sample Inference on Unlabeled Images === #
+    inference_images = [Path(cfg.paths.persistent_dir, x) for x in cfg.train.sample_inference]  # List of image paths
+    missing = [p for p in inference_images if not p.exists()]
+    if missing:
+        log.warning(f"train.sample_inference images not found, skipping them: {missing}")
+    inference_images = [p for p in inference_images if p.exists()]
 
-        inference_images = [Path(cfg.paths.persistent_dir, x) for x in cfg.train.sample_inference]  # List of image paths
+    if is_rank_zero and inference_images:
+        log.info("Running inference on sample unlabeled images...")
 
         # Dummy mask paths just to satisfy Dataset interface
         dummy_masks = inference_images  # dummy paths, ignored during inference
+
+        # Resize to the scale the model was trained at
+        scale = cfg.preprocess.tile.scale
+        rescale = A.RandomScale(scale_limit=(scale - 1, scale - 1), p=1.0) if scale != 1 else None
 
         # Load Dataset
         inference_dataset = Dataset(
             images_dir=inference_images,
             masks_dir=dummy_masks,  # dummy
-            augmentation=None,      # no augmentation needed
+            augmentation=rescale,
             normalize_image=cfg.train.dataset.normalize,
             mean=mean,
             std=std
@@ -284,7 +318,7 @@ def main(cfg: DictConfig):
 
             with torch.no_grad():
                 output = best_model(image)
-                mask_pred = output.argmax(dim=1).squeeze(0).cpu().numpy()
+                mask_pred = predict_mask(output, out_classes).squeeze(0).cpu().numpy()
 
             # Save visualization
             output_path = output_dir_infer / f"inference{idx}.png"

@@ -7,7 +7,6 @@ from omegaconf import OmegaConf  # Do not confuse with dataclass.MISSING
 from src.preprocess import main as preprocess
 from src.inference import main as inference
 from src.train import main as train
-from src.query import main as query
 from src.sync import main as sync
 from src.label import main as label
 
@@ -21,7 +20,6 @@ TASK_REGISTRY = {
     "preprocess": preprocess,
     "train": train,
     "inference": inference,
-    "query": query,
     # Add more tasks here as needed
 }
 

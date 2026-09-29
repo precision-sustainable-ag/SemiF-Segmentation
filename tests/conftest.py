@@ -16,10 +16,11 @@ def make_cfg(tmp_path):
 
     def _make(*overrides: str):
         GlobalHydra.instance().clear()
+        mode = [] if any(o.startswith("mode=") for o in overrides) else ["mode=label"]
         with initialize_config_dir(config_dir=str(REPO_ROOT / "conf"), version_base="1.3"):
             return compose(
                 config_name="config",
-                overrides=[f"paths.persistent_dir={tmp_path}", "mode=label", *overrides],
+                overrides=[f"paths.persistent_dir={tmp_path}", *mode, *overrides],
             )
 
     return _make

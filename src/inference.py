@@ -8,14 +8,12 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
 
-from src.inferencing.get_dataset import main as get_dataset
 from src.inferencing.inference import main as inference
 
 log = logging.getLogger(__name__)
 
 # Define a registry of tasks
 TASK_REGISTRY = {
-    "get_dataset": get_dataset,
     "inference": inference,
     # Add more tasks here as needed
 }

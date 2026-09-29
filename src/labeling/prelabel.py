@@ -15,6 +15,8 @@ import cv2
 import numpy as np
 import torch
 
+from src.utils.tiling import tile_starts
+
 log = logging.getLogger(__name__)
 
 
@@ -37,16 +39,6 @@ def load_weights(model: torch.nn.Module, checkpoint: str | Path) -> None:
         )
     if unexpected:
         log.warning("Ignoring %d unexpected keys in %s: %s", len(unexpected), checkpoint, unexpected[:5])
-
-
-def tile_starts(length: int, tile: int, stride: int) -> list[int]:
-    """Tile origins covering [0, length); the last tile is aligned to the end."""
-    if length <= tile:
-        return [0]
-    starts = list(range(0, length - tile + 1, stride))
-    if starts[-1] != length - tile:
-        starts.append(length - tile)
-    return starts
 
 
 class Prelabeler:

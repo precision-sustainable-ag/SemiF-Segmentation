@@ -5,6 +5,7 @@ seed: 42
 augment: default
 class_mode: binary # multiclass or binary
 out_classes: 1 # 1 for binary, 3 for multiclass
+class_names: [background, vegetation] # mask value -> name, for plots and data stats
 
 
 loss:
