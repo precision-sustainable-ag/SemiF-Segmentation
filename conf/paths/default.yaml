@@ -3,15 +3,22 @@
 root_dir: ${hydra:runtime.cwd}
 persistent_dir: /home/mkutuga/SemiF-Segmentation
 
-project_dir: ${paths.persistent_dir}/projects/${project.name}
+# Everything a project produces is in its AgIR-CVToolkit-style folder,
+# outputs/runs/<project.name>/: the labeling ledger (labels.db), one run folder
+# per labeling round (<round>/, laid out as described in
+# src/labeling/run_folder.py), and the preprocess/, train/ and inference/ outputs.
+out_root: ${paths.persistent_dir}/outputs/runs
+project_dir: ${paths.out_root}/${project.name}
 project_mode_dir: ${paths.project_dir}/${mode}
 project_preprocess_dir: ${paths.project_dir}/preprocess
 project_train_dir: ${paths.project_dir}/train
 project_inference_dir: ${paths.project_dir}/inference
 
-# path to data directory
+# Inputs and caches: source DB snapshots, image sets to run inference on
 data_dir: ${paths.persistent_dir}/data
 
+# Predictions for one input set by one trained model (train/version_<N>);
+# each run gets its own run/, run_2/, ... folder inside.
 inference_output_dir: ${paths.project_inference_dir}/${inference.inference.inference_subname}/version_${inference.inference.version}
 
 # preprocess outputs: the dataset manifest and its train/val/test tiles
@@ -22,13 +29,9 @@ split_dir: ${paths.project_preprocess_dir}/data/tiles_${paths.tile_suffix}
 inference:
   checkpoints: ${paths.project_train_dir}/version_${inference.inference.version}/checkpoints
 
-# Labeling rounds (mode=label) follow AgIR-CVToolkit's output format: one run
-# folder per round, outputs/runs/<project.name>/<project.subname>/ (the layout
-# is described in src/labeling/run_folder.py), next to the project's ledger.
-out_root: ${paths.persistent_dir}/outputs/runs
-project_runs_dir: ${paths.out_root}/${project.name}
-run_root: ${paths.project_runs_dir}/${project.subname}
-labels_db: ${paths.project_runs_dir}/labels.db    # one row per image in any of the project's rounds
-source_db_dir: ${paths.data_dir}/source_db        # local snapshots of the source DBs
-hydra_dirs:                                       # Hydra's output dir, for modes that don't use project_mode_dir
+# Labeling rounds (mode=label)
+run_root: ${paths.project_dir}/${project.subname}   # the round's run folder (project.subname = label.round)
+labels_db: ${paths.project_dir}/labels.db           # one row per image in any of the project's rounds
+source_db_dir: ${paths.data_dir}/source_db          # local snapshots of the source DBs
+hydra_dirs:                                         # Hydra's output dir, for modes that don't use project_mode_dir
   label: ${paths.run_root}/logs/hydra

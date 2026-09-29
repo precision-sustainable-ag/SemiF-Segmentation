@@ -54,7 +54,7 @@ def _labeled_ledger(cfg, n_images=6):
     """A round's run folder with n_images labeled 150x100 images, their human
     masks at CVAT resolution (120x80), and the last image excluded."""
     rng = np.random.default_rng(1)
-    run_root = Path(cfg.paths.project_runs_dir) / "r1"
+    run_root = Path(cfg.paths.project_dir) / "r1"
     image_dir = run_root / "field-batches/B/developed-images"
     mask_dir = run_root / "cvat_downloads/vegetation_001_r1/masks"
     image_dir.mkdir(parents=True)

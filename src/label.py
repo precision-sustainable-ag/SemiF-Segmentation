@@ -13,6 +13,9 @@ from src.labeling.select import main as select
 
 log = logging.getLogger(__name__)
 
+# The other modes' folders share outputs/runs/<project.name>/ with the rounds.
+RESERVED_ROUND_NAMES = {"preprocess", "train", "inference", "sync"}
+
 # Define a registry of tasks
 TASK_REGISTRY = {
     "select": select,
@@ -26,6 +29,9 @@ TASK_REGISTRY = {
 def main(cfg: DictConfig) -> None:
     """ Runs the enabled labeling tasks for one round (conf/label/<round>.yaml),
     in its AgIR-CVToolkit-style run folder, outputs/runs/<project.name>/<round>/ """
+    if cfg.label.round in RESERVED_ROUND_NAMES:
+        raise ValueError(f"label.round can't be {cfg.label.round!r}: outputs/runs/{cfg.project.name}/"
+                         f"{cfg.label.round}/ holds mode={cfg.label.round}'s outputs")
     devices = cfg.label.prelabel.cuda_visible_devices
     if devices:
         os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, devices))

@@ -131,6 +131,29 @@ python main.py mode=inference
   the same scale.
 - `train` validates and tests the best checkpoint and writes `run_info.json`
   (metrics, label rounds, per-split counts) to the run's version directory.
+- `inference` runs `train/version_<inference.inference.version>` on the images
+  in `inference.inference.explicit_img_dir.img_dir` and writes a new `run/`,
+  `run_2/`, ... folder each time, so re-running with another threshold never
+  overwrites earlier predictions.
+
+## Where outputs go
+
+Everything a project produces sits in its AgIR-CVToolkit-style folder,
+`outputs/runs/<project.name>/`; `data/` only holds inputs and caches (source
+DB snapshots, image sets to run inference on).
+
+```
+outputs/runs/<project.name>/
+├── labels.db                                    # labeling ledger (splits too)
+├── <round>/                                     # one run folder per labeling round (above)
+├── preprocess/data/                             # manifest.csv, tiles_<size>px_scale<scale>/, data_stats/
+├── train/version_<N>/                           # checkpoints/best.ckpt, metrics.csv, run_info.json
+└── inference/<input set>/version_<N>/run_<n>/   # masks/, overlays/, plots/, inference_times.csv, .hydra/
+```
+
+Predictions are grouped by input set (`inference.inference.inference_subname`)
+and by the model version that made them. Each mode's Hydra logs are in
+`<mode>/hydra/`, except a labeling round's, which are in its `logs/hydra/`.
 
 ## Configuration
 
@@ -142,7 +165,7 @@ python main.py mode=inference
 | `conf/cvat/` | CVAT URL/organization (defaults from `.keys/keys.yaml`), project, job size, when to pull |
 | `conf/preprocess/` | Split sizes and grouping, tile scale/size |
 | `conf/model/`, `conf/train/`, `conf/augment/`, `conf/inference/` | Model, training, augmentation, inference |
-| `conf/paths/` | Where everything is written (labeling rounds: `outputs/runs/`; preprocess, train, inference: `projects/`) |
+| `conf/paths/` | Where everything is written: `outputs/runs/<project.name>/` |
 
 ## Tests
 

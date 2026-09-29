@@ -21,7 +21,8 @@ run, with project.subname = label.round:
     metrics.json             status counts and each task's latest summary
 
 The project's ledger, labels.db, sits next to its rounds in
-outputs/runs/<project.name>/.
+outputs/runs/<project.name>/, as do the preprocess/, train/ and inference/
+folders of the other modes.
 """
 
 from __future__ import annotations
