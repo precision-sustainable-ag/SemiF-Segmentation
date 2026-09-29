@@ -6,7 +6,6 @@ tasks:
   train_val_test_split: true # successfully tested
   
   data_stats: true # successfully tested
-  viz_results: true
 
 use_synthetic:
   enable: false
@@ -39,6 +38,3 @@ train_val_test_split:
 
 data_stats:
   ignore_background: False # True ignores the background class for plotting
-
-viz_results:
-  model_dir_n:  # model subdirectory to visualize
