@@ -483,3 +483,20 @@ def test_push_cvat_uploads_each_tasks_prelabels_before_the_next_task(split_cfg, 
     # Only IMG0 has a pre-label; it's uploaded before the next task is created.
     assert events == ["create", "prelabels 100", "create", "create"]
     assert summary["prelabels_uploaded"] == 1 and [t["prelabels_uploaded"] for t in summary["tasks"]] == [1, 0, 0]
+
+
+def test_push_cvat_logs_the_plan_before_creating_tasks(split_cfg, monkeypatch, caplog):
+    cfg = split_cfg
+    OmegaConf.update(cfg, "cvat.task_size", 2)
+    OmegaConf.update(cfg, "cvat.segment_size", 1)
+    fake = FakeCvat()
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+    with caplog.at_level("INFO", logger="src.labeling.push_cvat"):
+        summary = push_cvat.main(cfg)
+    plan = next(r.getMessage() for r in caplog.records if r.getMessage().startswith("Push plan"))
+    assert plan.splitlines()[0] == "Push plan: 3 images (12 frames) -> 2 tasks, 3 jobs"
+    assert "4 frame(s) per image: 3 images -> 2 tasks (2, 1 images), 3 jobs of up to 1 images (4 frames)" in plan
+    assert len(summary["tasks"]) == 2 and sum(t["jobs"] for t in summary["tasks"]) == 3

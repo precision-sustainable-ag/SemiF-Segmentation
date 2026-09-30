@@ -18,6 +18,7 @@ set up; an image whose files are gone goes back to `fetched` for prepare.
 
 import json
 import logging
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -83,6 +84,7 @@ def main(cfg: DictConfig) -> dict | None:
                 ledger.update(source, item["image_id"], status="fetched", error=None)
                 continue
             by_n_tiles[len(tiles)].append((item, tiles))
+        _log_plan(by_n_tiles, ccfg)
         vegetation_id = label_ids[ccfg.vegetation_label.name]
         # Pre-labels left over from an earlier, interrupted push go first.
         prelabels = _upload_prelabels(client, ledger, source, ledger.pending_prelabel_tiles(lcfg.round),
@@ -104,6 +106,26 @@ def main(cfg: DictConfig) -> dict | None:
             summary.update(images=sum(t["images"] for t in tasks), tasks=tasks)
         summary["prelabels_uploaded"] = prelabels
     return summary
+
+
+def _log_plan(by_n_tiles: dict, ccfg) -> None:
+    """Before anything is created: how many tasks, jobs and frames the push will make."""
+    images_per_job = int(ccfg.segment_size)
+    total = {"images": 0, "frames": 0, "tasks": 0, "jobs": 0}
+    lines = []
+    for n_tiles, group in sorted(by_n_tiles.items()):
+        task_size = int(ccfg.task_size or len(group))
+        sizes = [min(task_size, len(group) - start) for start in range(0, len(group), task_size)]
+        jobs = sum(math.ceil(n / images_per_job) for n in sizes)
+        lines.append(f"  {n_tiles} frame(s) per image: {len(group)} images -> {len(sizes)} tasks "
+                     f"({', '.join(map(str, sizes))} images), {jobs} jobs of up to {images_per_job} images "
+                     f"({images_per_job * n_tiles} frames)")
+        for key, value in (("images", len(group)), ("frames", len(group) * n_tiles),
+                           ("tasks", len(sizes)), ("jobs", jobs)):
+            total[key] += value
+    if total["images"]:
+        log.info("Push plan: %d images (%d frames) -> %d tasks, %d jobs\n%s", total["images"], total["frames"],
+                 total["tasks"], total["jobs"], "\n".join(lines))
 
 
 def _create_task(client, ccfg, ledger, round_name, task_name, source, project, group, n_tiles) -> dict:
