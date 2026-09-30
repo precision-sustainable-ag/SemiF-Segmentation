@@ -464,3 +464,22 @@ def test_push_cvat_sends_images_with_missing_frames_back_to_prepare(split_cfg, m
     assert items["IMG1"]["status"] == "fetched" and items["IMG0"]["status"] == "in_cvat"
     assert prepare.main(cfg)["prepared"] == 1 and push_cvat.main(cfg)["images"] == 1
     assert {i["status"] for i in statuses(cfg).values()} == {"in_cvat"}
+
+
+def test_push_cvat_uploads_each_tasks_prelabels_before_the_next_task(split_cfg, monkeypatch):
+    cfg = split_cfg
+    OmegaConf.update(cfg, "cvat.task_size", 1)
+    fake = FakeCvat()
+    events = []
+    create, annotate = fake.create_task, fake.add_task_annotations
+    fake.create_task = lambda *a, **k: events.append("create") or create(*a, **k)
+    fake.add_task_annotations = lambda task_id, *a, **k: events.append(f"prelabels {task_id}") or annotate(task_id, *a, **k)
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+
+    summary = push_cvat.main(cfg)
+    # Only IMG0 has a pre-label; it's uploaded before the next task is created.
+    assert events == ["create", "prelabels 100", "create", "create"]
+    assert summary["prelabels_uploaded"] == 1 and [t["prelabels_uploaded"] for t in summary["tasks"]] == [1, 0, 0]

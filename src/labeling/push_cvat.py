@@ -8,9 +8,10 @@ several when prepare split it into tiles. `cvat.task_size` and
 its jobs segment_size images each, i.e. segment_size x tiles-per-image frames.
 Images are grouped into tasks by their number of tiles so that every job
 boundary falls between images, and each image's tiles are checked to have
-landed in one job. The run folder's images/ are uploaded, and its masks/ (the
-pre-labels) as editable masks; that step is tracked per frame, so a crash
-after the images are uploaded is recovered by re-running push_cvat. With
+landed in one job. The run folder's images/ are uploaded, and right after each
+task its masks/ (the pre-labels) as editable masks, so a task is complete as
+soon as it appears; that step is tracked per frame, so a crash after the
+images are uploaded is recovered by re-running push_cvat. With
 `cvat.delete_frames_after_push`, a task's frame files are deleted once it's
 set up; an image whose files are gone goes back to `fetched` for prepare.
 """
@@ -82,21 +83,26 @@ def main(cfg: DictConfig) -> dict | None:
                 ledger.update(source, item["image_id"], status="fetched", error=None)
                 continue
             by_n_tiles[len(tiles)].append((item, tiles))
+        vegetation_id = label_ids[ccfg.vegetation_label.name]
+        # Pre-labels left over from an earlier, interrupted push go first.
+        prelabels = _upload_prelabels(client, ledger, source, ledger.pending_prelabel_tiles(lcfg.round),
+                                      vegetation_id, ccfg)
         tasks = []
         for n_tiles, group in sorted(by_n_tiles.items()):
             task_size = int(ccfg.task_size or len(group))
             for start in range(0, len(group), task_size):
-                tasks.append(_create_task(client, ccfg, ledger, lcfg.round, task_name, source, project,
-                                          group[start:start + task_size], n_tiles))
+                task = _create_task(client, ccfg, ledger, lcfg.round, task_name, source, project,
+                                    group[start:start + task_size], n_tiles)
+                # Each task gets its pre-labels right away, so it's ready to annotate as soon as it appears.
+                pending = [t for t in ledger.pending_prelabel_tiles(lcfg.round) if t["cvat_task_id"] == task["task_id"]]
+                task["prelabels_uploaded"] = _upload_prelabels(client, ledger, source, pending, vegetation_id, ccfg)
+                prelabels += task["prelabels_uploaded"]
+                tasks.append(task)
         if len(tasks) == 1:
             summary.update(tasks[0])
         elif tasks:
             summary.update(images=sum(t["images"] for t in tasks), tasks=tasks)
-
-        pending = ledger.pending_prelabel_tiles(lcfg.round)
-        if pending:
-            summary["prelabels_uploaded"] = _upload_prelabels(
-                client, ledger, source, pending, label_ids[ccfg.vegetation_label.name], ccfg)
+        summary["prelabels_uploaded"] = prelabels
     return summary
 
 
