@@ -9,6 +9,7 @@ import segmentation_models_pytorch.losses as smp_losses
 import torch
 import torch.nn.functional as F
 from matplotlib.ticker import MaxNLocator
+from omegaconf import OmegaConf
 
 log = logging.getLogger(__name__)
 
@@ -191,7 +192,12 @@ class SegmentationModule(pl.LightningModule):
             **kwargs: Additional arguments for model configuration.
         """
         super().__init__()
-        self.save_hyperparameters()
+        # Only what the model reads: the full config has label-mode paths that
+        # need label.round, which the logger can't resolve outside mode=label.
+        self.save_hyperparameters({
+            "model": OmegaConf.to_container(cfg.model, resolve=True),
+            "train": OmegaConf.to_container(cfg.train, resolve=True),
+        })
         self.cfg = cfg
         self.arch_name=cfg.model.arch_name
         self.encoder_name=cfg.model.encoder_name

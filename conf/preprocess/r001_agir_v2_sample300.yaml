@@ -1,0 +1,27 @@
+# Builds the training set from the human labels in labels.db (mode=label).
+defaults:
+  - default@preprocess
+  - _self_
+
+tasks:
+  build_dataset: true   # assign train/val/test per image (kept forever) and write the manifest
+  tile: true            # cut images and masks into tiles at tile.scale
+  data_stats: true      # RGB mean/std of the train tiles + class pixel balance
+
+build_dataset:
+  val_size: 0.05
+  test_size: 0.05
+  group_by: batch       # image | batch | location: images in one group always share a split
+  sources: []           # limit to these sources (empty = all)
+  rounds: []            # limit to these rounds (empty = all)
+
+tile:
+  scale: 1.0            # fraction of native resolution to train at; inference.rescale_factor follows it
+  tile_size: 2048
+  overlap: 0
+  keep_background: 1.0  # fraction of background-only tiles to keep
+  seed: 42
+  workers: 16
+
+data_stats:
+  workers: 16

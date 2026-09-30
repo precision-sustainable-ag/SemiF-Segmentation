@@ -3,6 +3,7 @@ import hydra
 from pathlib import Path
 from datetime import datetime
 from omegaconf import DictConfig, OmegaConf
+import cv2
 import numpy as np
 import pandas as pd
 import json
@@ -37,6 +38,33 @@ def load_stats(stats_file: Path):
             data = json.load(f)
             return np.array(data['mean']), np.array(data['std'])
     return None, None
+
+def pick_sample_tiles(mask_paths, n: int, seed: int, min_vegetation: float = 0.01) -> list[int]:
+    """Indices of up to n tiles to show predictions for: three quarters with
+    vegetation (at least min_vegetation of the tile), the rest mostly bare, and
+    spread over as many source images as possible (round-robin by image)."""
+    rng = np.random.default_rng(seed)
+    by_kind = {True: {}, False: {}}
+    for idx, path in enumerate(mask_paths):
+        mask = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+        if mask is None:
+            continue
+        image = Path(path).stem.rsplit("_y", 1)[0]  # tiles are <source>__<image_id>_y<y>_x<x>
+        by_kind[bool((mask > 0).mean() >= min_vegetation)].setdefault(image, []).append(idx)
+
+    def round_robin(groups: dict, k: int) -> list[int]:
+        queues = [list(rng.permutation(groups[key])) for key in sorted(groups)]
+        queues = [queues[i] for i in rng.permutation(len(queues))]
+        picked = []
+        while len(picked) < k and any(queues):
+            for queue in queues:
+                if queue and len(picked) < k:
+                    picked.append(int(queue.pop()))
+        return picked
+
+    vegetated = round_robin(by_kind[True], n - n // 4)
+    return vegetated + round_robin(by_kind[False], n - len(vegetated))
+
 
 def predict_mask(logits: torch.Tensor, out_classes: int, threshold: float = 0.5) -> torch.Tensor:
     """(B, H, W) class indices from model logits: sigmoid threshold for binary
@@ -244,30 +272,30 @@ def main(cfg: DictConfig):
     class_colors = {idx: palette[idx % len(palette)] for idx in class_labels}
     out_classes = cfg.model.out_classes
 
-    if is_rank_zero and len(test_dataset):
-        log.info("Running sample inference on a test tile...")
-
-        best_model.eval()  # set model to eval mode
-
+    scfg = cfg.train.sample_predictions
+    if is_rank_zero and len(test_dataset) and scfg.n_test_tiles:
+        picks = pick_sample_tiles(test_dataset.masks_fps, int(scfg.n_test_tiles), int(scfg.seed),
+                                  float(scfg.min_vegetation))
+        log.info("Running sample inference on %d test tiles...", len(picks))
+        best_model.eval()
         output_dir = Path(logger.log_dir) / "sample_predictions"
         output_dir.mkdir(parents=True, exist_ok=True)
-
-        sample = test_dataset[0]
-        image = sample[0].unsqueeze(0).to(best_model.device)  # add batch dim
-        mask_gt = sample[1].cpu().numpy().squeeze()
-        mask_stem = sample[2]
-        img_path = test_image_dir / f"{mask_stem}.jpg"
-
-        with torch.no_grad():
-            output = best_model(image)
-            mask_pred = predict_mask(output, out_classes).squeeze(0).cpu().numpy()
-
-        # Save side-by-side plot
-        output_path = output_dir / f"test_prediction.png"
-
-        side_by_side_plot(img_path, mask_gt, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
-
-        log.info(f"Saved sample predictions to {output_dir}")
+        rows = []
+        for n, idx in enumerate(picks):
+            image_tensor, mask_gt, mask_stem = test_dataset[idx]
+            with torch.no_grad():
+                output = best_model(image_tensor.unsqueeze(0).to(best_model.device))
+                mask_pred = predict_mask(output, out_classes).squeeze(0).cpu().numpy()
+            mask_gt = mask_gt.cpu().numpy().squeeze()
+            union = np.count_nonzero((mask_gt > 0) | (mask_pred > 0))
+            iou = np.count_nonzero((mask_gt > 0) & (mask_pred > 0)) / union if union else 1.0
+            rows.append({"tile": mask_stem, "vegetation_frac": float((mask_gt > 0).mean()), "iou": iou})
+            side_by_side_plot(test_image_dir / f"{mask_stem}.jpg", mask_gt, mask_pred,
+                              output_dir / f"{n:02d}_iou{iou:.2f}_{mask_stem}.png",
+                              class_colors=class_colors, class_labels=class_labels)
+        pd.DataFrame(rows).to_csv(output_dir / "sample_predictions.csv", index=False)
+        log.info("Saved %d sample predictions (mean IoU %.3f) to %s", len(rows),
+                 float(np.mean([r["iou"] for r in rows])), output_dir)
 
     # === Sample Inference on Unlabeled Images === #
     inference_images = [Path(cfg.paths.persistent_dir, x) for x in cfg.train.sample_inference]  # List of image paths
@@ -322,7 +350,7 @@ def main(cfg: DictConfig):
 
             # Save visualization
             output_path = output_dir_infer / f"inference{idx}.png"
-            img_path = Path(inference_images[0]).parent / f"{mask_stem}.jpg"
+            img_path = Path(inference_dataset.images_fps[idx])
             side_by_side_plot(img_path, None, mask_pred, output_path, class_colors=class_colors, class_labels=class_labels)
 
         log.info(f"Saved unlabeled inference predictions to {output_dir_infer}")
