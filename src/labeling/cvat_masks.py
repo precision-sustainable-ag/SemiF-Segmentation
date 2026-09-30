@@ -62,6 +62,38 @@ def mask_shape(bitmap: np.ndarray, frame: int, label_id: int) -> dict | None:
     }
 
 
+def component_shapes(bitmap: np.ndarray, frame: int, label_id: int, min_area_px: int = 0) -> list[dict]:
+    """One CVAT "mask" shape per 8-connected blob of `bitmap`, largest first,
+    so annotators can select and edit each plant on its own. Blobs smaller
+    than `min_area_px` are dropped."""
+    bitmap = np.asarray(bitmap, dtype=bool)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(bitmap.astype(np.uint8), connectivity=8)
+    shapes = []
+    for i in sorted(range(1, n), key=lambda i: -stats[i, cv2.CC_STAT_AREA]):
+        if stats[i, cv2.CC_STAT_AREA] < min_area_px:
+            continue
+        x, y = stats[i, cv2.CC_STAT_LEFT], stats[i, cv2.CC_STAT_TOP]
+        w, h = stats[i, cv2.CC_STAT_WIDTH], stats[i, cv2.CC_STAT_HEIGHT]
+        points = encode_mask(labels[y:y + h, x:x + w] == i)
+        points[-4:] = [points[-4] + int(x), points[-3] + int(y), points[-2] + int(x), points[-1] + int(y)]
+        shapes.append({
+            "type": "mask", "frame": frame, "label_id": label_id, "points": points,
+            "occluded": False, "z_order": 0, "group": 0, "attributes": [], "source": "auto",
+        })
+    return shapes
+
+
+def resize_mask(mask: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    """Boolean mask resized to size=(width, height). Upscaling interpolates and
+    re-thresholds at 0.5, so edges come out smooth rather than as the
+    nearest-neighbour staircase."""
+    mask = np.asarray(mask, dtype=bool)
+    if (mask.shape[1], mask.shape[0]) == tuple(size):
+        return mask
+    resized = cv2.resize(mask.astype(np.uint8) * 255, tuple(size), interpolation=cv2.INTER_LINEAR)
+    return resized >= 128
+
+
 def rasterize(shapes: list[dict], height: int, width: int) -> tuple[np.ndarray, Counter]:
     """Union of mask, polygon, and rectangle shapes as a boolean mask.
 

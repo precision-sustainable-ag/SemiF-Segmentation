@@ -16,7 +16,8 @@ run, with project.subname = label.round:
     images/<image_id>.jpg    prepare: the downscaled copy uploaded to CVAT
     masks/<image_id>.png     prepare: the model pre-label uploaded with it (0/255)
     cvat_downloads/<task>/   pull_cvat: annotations/job_<id>.json as CVAT returned them, and
-                             masks/<image_id>.png, the human masks (0/1) at CVAT resolution
+                             the human masks (0/1): cvat_masks/<image_id>.png at CVAT resolution,
+                             masks/<image_id>.png scaled to the full-resolution image
     manifest.csv             one row per image: status, paths, CVAT task/job/frame
     metrics.json             status counts and each task's latest summary
 

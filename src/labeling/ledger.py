@@ -63,7 +63,49 @@ CREATE TABLE IF NOT EXISTS items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_round_status ON items(round, status);
+
+-- The frames an image is uploaded to CVAT as: one downscaled copy, or (with
+-- label.prepare.split) full-resolution pieces of it. x/y/width/height place the
+-- piece in the full-resolution image.
+CREATE TABLE IF NOT EXISTS tiles (
+    source                 TEXT NOT NULL,
+    image_id               TEXT NOT NULL,
+    name                   TEXT NOT NULL,  -- CVAT frame name (file stem)
+    x                      INTEGER NOT NULL,
+    y                      INTEGER NOT NULL,
+    width                  INTEGER NOT NULL,
+    height                 INTEGER NOT NULL,
+    cvat_image_path        TEXT NOT NULL,  -- the file uploaded to CVAT (images/)
+    cvat_width             INTEGER,
+    cvat_height            INTEGER,
+    prelabel_path          TEXT,           -- pre-label at CVAT resolution (masks/)
+    cvat_task_id           INTEGER,
+    cvat_job_id            INTEGER,
+    cvat_frame             INTEGER,
+    cvat_prelabel_uploaded INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (source, image_id, name),
+    FOREIGN KEY (source, image_id) REFERENCES items(source, image_id)
+);
 """
+
+# Ledgers from before `tiles` existed: each prepared image was one frame.
+_MIGRATE = """
+INSERT OR IGNORE INTO tiles (
+    source, image_id, name, x, y, width, height, cvat_image_path, cvat_width, cvat_height,
+    prelabel_path, cvat_task_id, cvat_job_id, cvat_frame, cvat_prelabel_uploaded
+)
+SELECT source, image_id, image_id, 0, 0, native_width, native_height, cvat_image_path, cvat_width,
+       cvat_height, prelabel_path, cvat_task_id, cvat_job_id, cvat_frame, cvat_prelabel_uploaded
+FROM items
+WHERE cvat_image_path IS NOT NULL AND native_width IS NOT NULL
+  AND status IN ('prepared', 'in_cvat', 'labeled', 'excluded')
+  AND NOT EXISTS (SELECT 1 FROM tiles t WHERE t.source = items.source AND t.image_id = items.image_id);
+"""
+
+_TILE_COLUMNS = (
+    "name", "x", "y", "width", "height", "cvat_image_path", "cvat_width", "cvat_height", "prelabel_path",
+)
+_TILE_UPDATABLE = {"cvat_task_id", "cvat_job_id", "cvat_frame", "cvat_prelabel_uploaded", "prelabel_path"}
 
 _UPDATABLE = {
     "round", "status", "path", "batch", "location", "meta_json", "root",
@@ -86,6 +128,7 @@ class LabelLedger:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.executescript(_SCHEMA)
+        self.conn.executescript(_MIGRATE)
 
     def close(self) -> None:
         self.conn.close()
@@ -190,3 +233,45 @@ class LabelLedger:
             "SELECT status, COUNT(*) AS n FROM items WHERE round = ? GROUP BY status", (round_name,)
         )
         return {r["status"]: r["n"] for r in rows}
+
+    # ---------- tiles ----------
+
+    def set_tiles(self, source: str, image_id: str, tiles: Iterable[dict]) -> None:
+        """Replace an image's tiles (prepare)."""
+        self.conn.execute("DELETE FROM tiles WHERE source = ? AND image_id = ?", (source, image_id))
+        self.conn.executemany(
+            f"INSERT INTO tiles (source, image_id, {', '.join(_TILE_COLUMNS)}) "
+            f"VALUES (?, ?, {', '.join('?' * len(_TILE_COLUMNS))})",
+            [(source, image_id, *(tile.get(col) for col in _TILE_COLUMNS)) for tile in tiles],
+        )
+        self.conn.commit()
+
+    def tiles(self, source: str, image_id: str) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM tiles WHERE source = ? AND image_id = ? ORDER BY y, x", (source, image_id)
+        )
+        return [dict(r) for r in rows]
+
+    def update_tile(self, source: str, image_id: str, name: str, **fields) -> None:
+        unknown = set(fields) - _TILE_UPDATABLE
+        if unknown:
+            raise ValueError(f"Unknown tile columns: {sorted(unknown)}")
+        assignments = ", ".join(f"{col} = ?" for col in fields)
+        self.conn.execute(
+            f"UPDATE tiles SET {assignments} WHERE source = ? AND image_id = ? AND name = ?",
+            [*fields.values(), source, image_id, name],
+        )
+        self.conn.commit()
+
+    def pending_prelabel_tiles(self, round_name: str) -> list[dict]:
+        """Tiles of images already in CVAT whose pre-label hasn't been uploaded."""
+        rows = self.conn.execute(
+            """
+            SELECT t.* FROM tiles t JOIN items i ON i.source = t.source AND i.image_id = t.image_id
+            WHERE i.round = ? AND i.status = 'in_cvat'
+              AND t.prelabel_path IS NOT NULL AND t.cvat_prelabel_uploaded = 0 AND t.cvat_task_id IS NOT NULL
+            ORDER BY t.cvat_task_id, t.cvat_frame
+            """,
+            (round_name,),
+        )
+        return [dict(r) for r in rows]

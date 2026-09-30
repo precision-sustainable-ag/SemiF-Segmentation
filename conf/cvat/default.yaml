@@ -9,6 +9,10 @@ vegetation_label: {name: vegetation, color: "#33cc33"}  # masks or polygons
 exclude_label: {name: exclude, color: "#ff3333"}        # frame tag: leave this image out of the dataset
 
 segment_size: 10          # images per job
+task_size: null           # images per task; null puts the whole push in one task
+delete_frames_after_push: true  # delete the run folder's images/ files once their task is set up in CVAT
+prelabel_shapes: components  # components: one mask shape per connected blob | single: one shape per image
+prelabel_min_area_px: 64     # with components, drop blobs smaller than this (at CVAT resolution)
 image_quality: 95         # quality of the compressed chunks CVAT shows annotators
 upload_batch_mb: 90       # size of one bulk upload request (CVAT's limit is 100 MiB)
 assignees: []             # CVAT usernames; new jobs are assigned round-robin

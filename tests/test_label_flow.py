@@ -31,7 +31,7 @@ class FakeCvat:
         self.job_state = {}
 
     def find_project(self, name):
-        return self.project
+        return self.project if self.project and self.project["name"] == name else None
 
     def create_project(self, name, labels):
         self.project = {"id": 1, "name": name, "labels": labels}
@@ -42,14 +42,14 @@ class FakeCvat:
 
     def create_task(self, name, project_id, segment_size):
         task_id = 100 + len(self.tasks)
-        self.tasks[task_id] = {"name": name, "segment_size": segment_size, "frames": [], "shapes": [], "tags": []}
+        self.tasks[task_id] = {"name": name, "project_id": project_id, "segment_size": segment_size, "frames": [], "shapes": [], "tags": []}
         return {"id": task_id}
 
     def delete_task(self, task_id):
         del self.tasks[task_id]
 
     def get_task(self, task_id):
-        return {"id": task_id, "name": self.tasks[task_id]["name"]}
+        return {"id": task_id, "name": self.tasks[task_id]["name"], "project_id": self.tasks[task_id]["project_id"]}
 
     def upload_images(self, task_id, paths, *, image_quality, max_request_bytes):
         # CVAT orders frames by name with sorting_method=natural.
@@ -170,7 +170,7 @@ def test_round_end_to_end(flow_cfg, monkeypatch):
     prelabel_path.parent.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(prelabel_path), prelabel)
     with LabelLedger(cfg.paths.labels_db) as ledger:
-        ledger.update("field", "IMG0", prelabel_path=str(prelabel_path))
+        ledger.update_tile("field", "IMG0", "IMG0", prelabel_path=str(prelabel_path))
 
     summary = push_cvat.main(cfg)
     items = statuses(cfg)
@@ -202,10 +202,12 @@ def test_round_end_to_end(flow_cfg, monkeypatch):
     assert Path(items["IMG0"]["mask_path"]) == downloads / "masks/IMG0.png"
     assert (downloads / f"annotations/job_{first_job['id']}.json").exists()
     mask = cv2.imread(items["IMG0"]["mask_path"], cv2.IMREAD_GRAYSCALE)
-    assert mask.shape == (48, 64) and set(np.unique(mask)) <= {0, 1}  # CVAT resolution
+    assert mask.shape == (90, 120) and set(np.unique(mask)) <= {0, 1}  # full resolution
     assert items["IMG0"]["changed_frac"] == 0.0
+    cvat_mask = cv2.imread(str(downloads / "cvat_masks/IMG1.png"), cv2.IMREAD_GRAYSCALE)
+    assert cvat_mask.shape == (48, 64) and cvat_mask[:24, :32].all() and cvat_mask.sum() == 24 * 32
     mask = cv2.imread(items["IMG1"]["mask_path"], cv2.IMREAD_GRAYSCALE)
-    assert mask[:24, :32].all() and mask.sum() == 24 * 32
+    assert mask.shape == (90, 120) and mask[:44, :59].all() and not mask[47:, :].any() and not mask[:, 62:].any()
 
     fake.job_state[second_job["id"]] = "completed"
     pull_cvat.main(cfg)
@@ -319,3 +321,146 @@ def test_push_cvat_deletes_task_when_upload_fails(flow_cfg, monkeypatch):
         push_cvat.main(cfg)
     assert fake.tasks == {}
     assert {i["status"] for i in statuses(cfg).values()} == {"prepared"}
+
+
+def test_pull_cvat_uses_the_tasks_own_project(flow_cfg, monkeypatch):
+    """Pulling with a different cvat.project_name than the push still reads the
+    right labels, and doesn't create a project."""
+    cfg = flow_cfg
+    fake = FakeCvat()
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+    push_cvat.main(cfg)
+
+    labels = fake.label_ids(1)
+    task = fake.tasks[100]
+    task["shapes"].append({"type": "polygon", "frame": 0, "label_id": labels["vegetation"],
+                           "points": [0, 0, 31, 0, 31, 23, 0, 23]})
+    for job in fake.task_jobs(100):
+        fake.job_state[job["id"]] = "completed"
+
+    def no_new_projects(*args, **kwargs):
+        raise AssertionError("pull_cvat must not create a CVAT project")
+
+    fake.create_project = no_new_projects
+    OmegaConf.update(cfg, "cvat.project_name", "some_other_project")
+    pull_cvat.main(cfg)
+    mask = cv2.imread(statuses(cfg)["IMG0"]["mask_path"], cv2.IMREAD_GRAYSCALE)
+    assert mask.shape == (90, 120) and mask[:44, :59].all()
+
+
+def test_tile_grid_covers_the_image_without_overlap():
+    assert [t[4:] for t in prepare.tile_grid(9560, 6368, 6144)] == [(4780, 3184)] * 4
+    grid = prepare.tile_grid(13368, 9520, 6144)
+    assert [(r, c) for r, c, *_ in grid] == [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)]
+    assert max(w for *_, w, h in grid) <= 6144 and max(h for *_, w, h in grid) <= 6144
+    covered = np.zeros((9520, 13368), np.uint8)
+    for _, _, x, y, w, h in grid:
+        covered[y:y + h, x:x + w] += 1
+    assert (covered == 1).all()
+    assert prepare.tile_grid(5000, 4000, 6144) == [(0, 0, 0, 0, 5000, 4000)]
+
+
+@pytest.fixture
+def split_cfg(flow_cfg):
+    """Fixture images are 120x90: max_side=64 cuts each into 2x2 tiles of 60x45."""
+    cfg = flow_cfg
+    OmegaConf.update(cfg, "label.prepare.split", True)
+    OmegaConf.update(cfg, "cvat.segment_size", 2)
+    masks_root = Path(cfg.paths.persistent_dir) / "segs"
+    OmegaConf.update(cfg, "label.prelabel.enable", True)
+    OmegaConf.update(cfg, "label.prelabel.source", "masks")
+    OmegaConf.update(cfg, "label.prelabel.masks_root", str(masks_root))
+    OmegaConf.update(cfg, "label.prelabel.missing_mask", "empty")
+    seg = np.zeros((90, 120), np.uint8)
+    seg[50:70, 70:100] = 26  # inside IMG0's bottom-right tile
+    (masks_root / "B0/segmentations").mkdir(parents=True)
+    cv2.imwrite(str(masks_root / "B0/segmentations/IMG0.png"), seg)
+    return cfg
+
+
+def test_split_round_keeps_tiles_in_one_job_and_rebuilds_full_masks(split_cfg, monkeypatch):
+    cfg = split_cfg
+    fake = FakeCvat()
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    counts = prepare.main(cfg)
+    assert counts["prepared"] == 3 and counts["frames"] == 12
+    run = RunFolder(cfg.paths.run_root)
+    with LabelLedger(cfg.paths.labels_db) as ledger:
+        tiles = ledger.tiles("field", "IMG0")
+    assert [t["name"] for t in tiles] == ["IMG0_r0c0", "IMG0_r0c1", "IMG0_r1c0", "IMG0_r1c1"]
+    assert [(t["x"], t["y"], t["width"], t["height"]) for t in tiles] == [
+        (0, 0, 60, 45), (60, 0, 60, 45), (0, 45, 60, 45), (60, 45, 60, 45)]
+    assert cv2.imread(tiles[3]["cvat_image_path"]).shape[:2] == (45, 60)  # full resolution
+    assert tiles[3]["prelabel_path"] and cv2.imread(tiles[3]["prelabel_path"], 0)[5:25, 10:40].all()
+
+    summary = push_cvat.main(cfg)
+    assert summary["images"] == 3 and summary["frames"] == 12 and summary["jobs"] == 2
+    task = fake.tasks[100]
+    assert task["segment_size"] == 8  # 2 images x 4 tiles
+    items = statuses(cfg)
+    assert [items[f"IMG{n}"]["cvat_job_id"] for n in range(3)] == [1000, 1000, 1001]
+    with LabelLedger(cfg.paths.labels_db) as ledger:
+        assert {t["cvat_job_id"] for t in ledger.tiles("field", "IMG2")} == {1001}
+        assert all(t["cvat_prelabel_uploaded"] for t in ledger.tiles("field", "IMG0"))
+    # IMG0's pre-label is on its bottom-right tile only.
+    assert {s["frame"] for s in task["shapes"]} == {3}
+    # CVAT has the frames; the local copies are gone, the pre-labels stay.
+    assert not list(run.images.iterdir()) and tiles[3]["prelabel_path"] and Path(tiles[3]["prelabel_path"]).exists()
+
+    # Annotator: fills IMG1's top-left tile, completes job 1 (IMG0 and IMG1) only.
+    labels = fake.label_ids(1)
+    task["shapes"].append({"type": "polygon", "frame": 4, "label_id": labels["vegetation"],
+                           "points": [0, 0, 59, 0, 59, 44, 0, 44]})
+    fake.job_state[1000] = "completed"
+    counts = pull_cvat.main(cfg)
+    assert counts == {"labeled": 2, "excluded": 0, "waiting": 1}
+    items = statuses(cfg)
+    downloads = run.cvat_downloads / "vegetation_001_r_test"
+    img0 = cv2.imread(items["IMG0"]["mask_path"], cv2.IMREAD_GRAYSCALE)
+    assert img0.shape == (90, 120) and img0[50:70, 70:100].all() and img0.sum() == 20 * 30
+    assert items["IMG0"]["changed_frac"] == 0.0
+    img1 = cv2.imread(items["IMG1"]["mask_path"], cv2.IMREAD_GRAYSCALE)
+    assert img1[:45, :60].all() and img1.sum() == 45 * 60
+    assert sorted(p.name for p in (downloads / "cvat_masks").iterdir()) == [
+        f"IMG{n}_r{r}c{c}.png" for n in (0, 1) for r in (0, 1) for c in (0, 1)]
+
+
+def test_push_cvat_refuses_tasks_that_split_an_image_across_jobs(split_cfg, monkeypatch):
+    cfg = split_cfg
+    fake = FakeCvat()
+    real_jobs = fake.task_jobs
+    fake.task_jobs = lambda task_id: [dict(j, stop_frame=j["stop_frame"] - 1 if j["start_frame"] == 0 else j["stop_frame"],
+                                           start_frame=j["start_frame"] - 1 if j["start_frame"] else 0)
+                                      for j in real_jobs(task_id)]  # boundary one frame early
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+    with pytest.raises(Exception, match="landed in jobs"):
+        push_cvat.main(cfg)
+    assert fake.tasks == {}
+    assert {i["status"] for i in statuses(cfg).values()} == {"prepared"}
+
+
+def test_push_cvat_sends_images_with_missing_frames_back_to_prepare(split_cfg, monkeypatch):
+    cfg = split_cfg
+    OmegaConf.update(cfg, "cvat.delete_frames_after_push", False)
+    fake = FakeCvat()
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+    run = RunFolder(cfg.paths.run_root)
+    (run.images / "IMG1_r0c1.jpg").unlink()
+
+    summary = push_cvat.main(cfg)
+    assert summary["images"] == 2 and len(list(run.images.iterdir())) == 11  # kept this time
+    items = statuses(cfg)
+    assert items["IMG1"]["status"] == "fetched" and items["IMG0"]["status"] == "in_cvat"
+    assert prepare.main(cfg)["prepared"] == 1 and push_cvat.main(cfg)["images"] == 1
+    assert {i["status"] for i in statuses(cfg).values()} == {"in_cvat"}

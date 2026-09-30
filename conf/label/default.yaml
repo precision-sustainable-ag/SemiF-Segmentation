@@ -27,11 +27,21 @@ fetch:
   dry_run: false          # log the planned transfers without running them
 
 prepare:
-  max_side: 6144          # longest side of the copy uploaded to CVAT
+  max_side: 6144          # longest side of each frame uploaded to CVAT
+  split: false            # false: downscale the whole image to max_side; true: cut it at full
+                          # resolution, without overlap, into tiles of at most max_side
+                          # (2x2 for 9560x6368, 3x2 for 13368x9520); an image's tiles share one job
   jpeg_quality: 95
 
 prelabel:
   enable: true
+  # model: run the checkpoint below. masks: use existing masks laid out like
+  # AgIR-CVToolkit's, <masks_root>/<batch>/segmentations/<image_id>.png, where
+  # <batch> is the folder above images/ in the source DB path; any nonzero
+  # pixel is vegetation. Images with no mask fall back to missing_mask.
+  source: model           # model | masks
+  masks_root:       # e.g. /mnt/globus/MK_test/agir_v2_sample300/semifield-developed-images
+  missing_mask: model     # model | empty (start empty in CVAT)
   # Binary UNet (mit_b4) from Field-AnnotationPipeline; swap in a model trained
   # here once one exists (and set normalize: true with its data_stats mean/std).
   checkpoint: /home/mkutuga/Field-AnnotationPipeline/data/models/train_unet_mitb4_v4/checkpoints/epoch=51-step=3484-val_loss=0.00.ckpt

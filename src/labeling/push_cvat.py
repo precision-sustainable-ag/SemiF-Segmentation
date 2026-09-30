@@ -1,12 +1,18 @@
-"""push_cvat: create a CVAT task for the round's prepared images.
+"""push_cvat: create CVAT tasks for the round's prepared images.
 
-The task is named <project.name>_<project.subname>, as AgIR-CVToolkit's
-cvat_upload named them, goes into the configured project (created with the
-vegetation and exclude labels if it doesn't exist), and is split into jobs of
-`cvat.segment_size` images. With `cvat.task_size` set, the images are spread
-over several tasks of at most that many images each. The run folder's images/ are uploaded, and its
-masks/ (the pre-labels) as editable masks; that step is tracked per image, so
-a crash after the images are uploaded is recovered by re-running push_cvat.
+A task is named <project.name>_<project.subname>, as AgIR-CVToolkit's
+cvat_upload named them, and goes into the configured project (created with the
+vegetation and exclude labels if it doesn't exist). Each image is one frame, or
+several when prepare split it into tiles. `cvat.task_size` and
+`cvat.segment_size` count images: a task holds at most task_size images, and
+its jobs segment_size images each, i.e. segment_size x tiles-per-image frames.
+Images are grouped into tasks by their number of tiles so that every job
+boundary falls between images, and each image's tiles are checked to have
+landed in one job. The run folder's images/ are uploaded, and its masks/ (the
+pre-labels) as editable masks; that step is tracked per frame, so a crash
+after the images are uploaded is recovered by re-running push_cvat. With
+`cvat.delete_frames_after_push`, a task's frame files are deleted once it's
+set up; an image whose files are gone goes back to `fetched` for prepare.
 """
 
 import json
@@ -17,8 +23,8 @@ from pathlib import Path
 import cv2
 from omegaconf import DictConfig
 
-from src.labeling.cvat_client import CvatClient
-from src.labeling.cvat_masks import mask_shape
+from src.labeling.cvat_client import CvatClient, CvatError
+from src.labeling.cvat_masks import component_shapes, mask_shape
 from src.labeling.ledger import LabelLedger
 
 log = logging.getLogger(__name__)
@@ -53,11 +59,7 @@ def main(cfg: DictConfig) -> dict | None:
 
     with LabelLedger(cfg.paths.labels_db) as ledger:
         items = ledger.items_for_task(lcfg.round, "prepared", "push_cvat", lcfg.retry_errors)
-        pending_prelabels = [
-            i for i in ledger.items(round_name=lcfg.round, status="in_cvat")
-            if i["prelabel_path"] and not i["cvat_prelabel_uploaded"]
-        ]
-        if not items and not pending_prelabels:
+        if not items and not ledger.pending_prelabel_tiles(lcfg.round):
             log.info("Nothing to push to CVAT for round %s.", lcfg.round)
             return None
 
@@ -66,67 +68,95 @@ def main(cfg: DictConfig) -> dict | None:
 
         summary = {"project_id": project["id"], "images": 0}
         task_name = f"{cfg.project.name}_{cfg.project.subname}"
-        task_size = int(ccfg.task_size or len(items) or 1)
-        tasks = [
-            _create_task(client, ccfg, ledger, lcfg.round, task_name, source, project, items[start:start + task_size])
-            for start in range(0, len(items), task_size)
-        ]
+        by_n_tiles = defaultdict(list)
+        for item in items:
+            tiles = ledger.tiles(source, item["image_id"])
+            if not tiles:
+                ledger.update(source, item["image_id"], status="error", error="push_cvat: no frames; re-run prepare")
+                continue
+            missing = [t["cvat_image_path"] for t in tiles if not Path(t["cvat_image_path"]).exists()]
+            if missing:
+                # Frame files are deleted after a push (cvat.delete_frames_after_push); prepare remakes them.
+                log.warning("%s: %d frame file(s) missing (e.g. %s); back to fetched, re-run to prepare it again",
+                            item["image_id"], len(missing), missing[0])
+                ledger.update(source, item["image_id"], status="fetched", error=None)
+                continue
+            by_n_tiles[len(tiles)].append((item, tiles))
+        tasks = []
+        for n_tiles, group in sorted(by_n_tiles.items()):
+            task_size = int(ccfg.task_size or len(group))
+            for start in range(0, len(group), task_size):
+                tasks.append(_create_task(client, ccfg, ledger, lcfg.round, task_name, source, project,
+                                          group[start:start + task_size], n_tiles))
         if len(tasks) == 1:
             summary.update(tasks[0])
         elif tasks:
             summary.update(images=sum(t["images"] for t in tasks), tasks=tasks)
 
-        pending = [
-            i for i in ledger.items(round_name=lcfg.round, status="in_cvat")
-            if i["prelabel_path"] and not i["cvat_prelabel_uploaded"]
-        ]
+        pending = ledger.pending_prelabel_tiles(lcfg.round)
         if pending:
             summary["prelabels_uploaded"] = _upload_prelabels(
-                client, ledger, source, pending, label_ids[ccfg.vegetation_label.name])
+                client, ledger, source, pending, label_ids[ccfg.vegetation_label.name], ccfg)
     return summary
 
 
-def _create_task(client, ccfg, ledger, round_name, task_name, source, project, items) -> dict:
+def _create_task(client, ccfg, ledger, round_name, task_name, source, project, group, n_tiles) -> dict:
+    """One task for `group`, [(item, tiles), ...] with n_tiles tiles each."""
     previous_tasks = {i["cvat_task_id"] for i in ledger.items(round_name=round_name) if i["cvat_task_id"]}
     name = task_name if not previous_tasks else f"{task_name}-{len(previous_tasks) + 1}"
-    task = client.create_task(name, project["id"], int(ccfg.segment_size))
+    images_per_job = int(ccfg.segment_size)
+    task = client.create_task(name, project["id"], images_per_job * n_tiles)
     task_id = task["id"]
-    log.info("Created CVAT task %s (id %s) for %d images", name, task_id, len(items))
+    log.info("Created CVAT task %s (id %s) for %d images (%d frames)", name, task_id, len(group), len(group) * n_tiles)
 
     try:
         client.upload_images(
-            task_id, [Path(i["cvat_image_path"]) for i in items],
+            task_id, [Path(t["cvat_image_path"]) for _, tiles in group for t in tiles],
             image_quality=int(ccfg.image_quality), max_request_bytes=int(ccfg.upload_batch_mb * 2**20),
         )
+        meta = client.task_frames(task_id)
+        start = meta.get("start_frame", 0)
+        frame_of = {Path(f["name"]).stem: start + idx for idx, f in enumerate(meta["frames"])}
+        jobs = client.task_jobs(task_id)
+        job_of = lambda frame: next((j["id"] for j in jobs if j["start_frame"] <= frame <= j["stop_frame"]), None)
+
+        placed = []
+        for item, tiles in group:
+            frames = [frame_of.get(t["name"]) for t in tiles]
+            if None in frames:
+                raise CvatError(f"{item['image_id']}: not all of its frames are in task {task_id}")
+            job_ids = {job_of(f) for f in frames}
+            if len(job_ids) != 1:
+                raise CvatError(f"{item['image_id']}: its {n_tiles} tiles landed in jobs {sorted(job_ids)}")
+            placed.append((item, tiles, frames, job_ids.pop()))
     except Exception:
         # The images stay `prepared`, so the next run makes a new task; don't leave this one behind.
-        log.error("Uploading to task %s failed; deleting it", task_id)
+        log.error("Setting up task %s failed; deleting it", task_id)
         try:
             client.delete_task(task_id)
         except Exception:
             log.exception("Could not delete CVAT task %s; delete it by hand", task_id)
         raise
 
-    meta = client.task_frames(task_id)
-    start = meta.get("start_frame", 0)
-    frame_of = {Path(f["name"]).stem: start + idx for idx, f in enumerate(meta["frames"])}
-    jobs = client.task_jobs(task_id)
-
-    for item in items:
-        frame = frame_of.get(item["image_id"])
-        if frame is None:
-            ledger.update(source, item["image_id"], status="error",
-                          error=f"push_cvat: not among task {task_id}'s frames")
-            continue
-        job_id = next((j["id"] for j in jobs if j["start_frame"] <= frame <= j["stop_frame"]), None)
+    for item, tiles, frames, job_id in placed:
+        for tile, frame in zip(tiles, frames):
+            ledger.update_tile(source, item["image_id"], tile["name"], cvat_task_id=task_id,
+                               cvat_frame=frame, cvat_job_id=job_id, cvat_prelabel_uploaded=0)
         ledger.update(source, item["image_id"], status="in_cvat", cvat_task_id=task_id,
-                      cvat_frame=frame, cvat_job_id=job_id, cvat_prelabel_uploaded=0, error=None)
-    log.info("Task %s: %d jobs of up to %d images", task_id, len(jobs), ccfg.segment_size)
+                      cvat_frame=min(frames), cvat_job_id=job_id, cvat_prelabel_uploaded=0, error=None)
+    log.info("Task %s: %d jobs of up to %d images (%d frames)", task_id, len(jobs), images_per_job,
+             images_per_job * n_tiles)
+
+    if ccfg.delete_frames_after_push:
+        # CVAT has them now; pull_cvat and training don't read them.
+        for _, tiles, _, _ in placed:
+            for tile in tiles:
+                Path(tile["cvat_image_path"]).unlink(missing_ok=True)
 
     if ccfg.assignees:
         _assign_jobs(client, jobs, list(ccfg.assignees))
     return {"task_id": task_id, "task_name": name, "task_url": f"{client.base}/tasks/{task_id}",
-            "images": len(items), "jobs": len(jobs)}
+            "images": len(group), "frames": len(group) * n_tiles, "jobs": len(jobs)}
 
 
 def _assign_jobs(client, jobs, usernames) -> None:
@@ -144,43 +174,52 @@ def _assign_jobs(client, jobs, usernames) -> None:
             log.info("Assigned job %s to %s", job["id"], username)
 
 
-def _upload_prelabels(client, ledger, source, items, label_id) -> int:
+def _upload_prelabels(client, ledger, source, tiles, label_id, ccfg) -> int:
+    """Upload the pre-labels of `tiles` (ledger tiles rows, sorted by task)."""
+    split = ccfg.prelabel_shapes == "components"
+    if ccfg.prelabel_shapes not in ("components", "single"):
+        raise ValueError(f"cvat.prelabel_shapes must be components or single, not {ccfg.prelabel_shapes!r}")
+    min_area_px = int(ccfg.prelabel_min_area_px or 0)
     by_task = defaultdict(list)
-    for item in items:
-        by_task[item["cvat_task_id"]].append(item)
+    for tile in tiles:
+        by_task[tile["cvat_task_id"]].append(tile)
 
     uploaded = 0
-    for task_id, task_items in by_task.items():
+    for task_id, task_tiles in by_task.items():
         meta = client.task_frames(task_id)
         start = meta.get("start_frame", 0)
-        shapes, batch_items, n_points = [], [], 0
-        for item in task_items:
-            frame_meta = meta["frames"][item["cvat_frame"] - start]
-            mask = cv2.imread(item["prelabel_path"], cv2.IMREAD_GRAYSCALE)
+        shapes, batch, n_points = [], [], 0
+        for tile in task_tiles:
+            frame_meta = meta["frames"][tile["cvat_frame"] - start]
+            mask = cv2.imread(tile["prelabel_path"], cv2.IMREAD_GRAYSCALE)
             if mask is None:
-                log.warning("Missing pre-label %s; %s starts empty in CVAT", item["prelabel_path"], item["image_id"])
+                log.warning("Missing pre-label %s; %s starts empty in CVAT", tile["prelabel_path"], tile["name"])
             else:
                 size = (frame_meta["width"], frame_meta["height"])
                 if (mask.shape[1], mask.shape[0]) != size:
                     mask = cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST)
-                shape = mask_shape(mask > 0, item["cvat_frame"], label_id)
-                if shape is not None:
-                    shapes.append(shape)
-                    n_points += len(shape["points"])
-            batch_items.append(item)
+                if split:
+                    new = component_shapes(mask > 0, tile["cvat_frame"], label_id, min_area_px)
+                else:
+                    new = [s for s in [mask_shape(mask > 0, tile["cvat_frame"], label_id)] if s is not None]
+                shapes.extend(new)
+                n_points += sum(len(s["points"]) for s in new)
+            batch.append(tile)
             if n_points >= _MAX_ANNOTATION_POINTS:
-                uploaded += _send(client, ledger, source, task_id, shapes, batch_items)
-                shapes, batch_items, n_points = [], [], 0
-        if batch_items:
-            uploaded += _send(client, ledger, source, task_id, shapes, batch_items)
+                uploaded += _send(client, ledger, source, task_id, shapes, batch)
+                shapes, batch, n_points = [], [], 0
+        if batch:
+            uploaded += _send(client, ledger, source, task_id, shapes, batch)
     return uploaded
 
 
-def _send(client, ledger, source, task_id, shapes, items) -> int:
+def _send(client, ledger, source, task_id, shapes, tiles) -> int:
     if shapes:
         client.add_task_annotations(task_id, shapes)
-    for item in items:
-        ledger.update(source, item["image_id"], cvat_prelabel_uploaded=1)
+    for tile in tiles:
+        ledger.update_tile(source, tile["image_id"], tile["name"], cvat_prelabel_uploaded=1)
+    for image_id in {t["image_id"] for t in tiles}:
+        ledger.update(source, image_id, cvat_prelabel_uploaded=1)
     log.info("Uploaded %d pre-label masks to task %s (%.1f MB of points)",
              len(shapes), task_id, len(json.dumps(shapes)) / 1e6 if shapes else 0.0)
     return len(shapes)
