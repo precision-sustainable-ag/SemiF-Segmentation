@@ -14,6 +14,11 @@ soon as it appears; that step is tracked per frame, so a crash after the
 images are uploaded is recovered by re-running push_cvat. With
 `cvat.delete_frames_after_push`, a task's frame files are deleted once it's
 set up; an image whose files are gone goes back to `fetched` for prepare.
+
+Box rounds (`label.prelabel.kind=sam3_boxes`) go into their own project,
+`cvat.detection.project_name`, whose labels are rectangles (one per detection
+class, `cvat.detection.labels`) plus the exclude tag; each image's boxes/ JSON
+is uploaded as one rectangle per plant.
 """
 
 import json
@@ -25,6 +30,7 @@ from pathlib import Path
 import cv2
 from omegaconf import DictConfig
 
+from src.labeling.cvat_boxes import class_names, is_box_round, rectangle_shape
 from src.labeling.cvat_client import CvatClient, CvatError
 from src.labeling.cvat_masks import component_shapes, mask_shape
 from src.labeling.ledger import LabelLedger
@@ -35,23 +41,34 @@ log = logging.getLogger(__name__)
 _MAX_ANNOTATION_POINTS = 2_000_000
 
 
-def project_labels(ccfg) -> list[dict]:
+def project_labels(ccfg, boxes: bool = False) -> list[dict]:
+    exclude = {"name": ccfg.exclude_label.name, "color": ccfg.exclude_label.color, "type": "tag", "attributes": []}
+    if boxes:
+        return [{"name": label.name, "color": label.color, "type": "rectangle", "attributes": []}
+                for label in ccfg.detection.labels] + [exclude]
     return [
         {"name": ccfg.vegetation_label.name, "color": ccfg.vegetation_label.color, "type": "any", "attributes": []},
-        {"name": ccfg.exclude_label.name, "color": ccfg.exclude_label.color, "type": "tag", "attributes": []},
+        exclude,
     ]
 
 
-def ensure_project(client: CvatClient, ccfg) -> tuple[dict, dict[str, int]]:
-    """The configured project and its {label name: id}, creating the project if needed."""
-    project = client.find_project(ccfg.project_name)
+def required_labels(ccfg, boxes: bool = False) -> list[str]:
+    shapes = list(class_names(ccfg).values()) if boxes else [ccfg.vegetation_label.name]
+    return shapes + [ccfg.exclude_label.name]
+
+
+def ensure_project(client: CvatClient, ccfg, boxes: bool = False) -> tuple[dict, dict[str, int]]:
+    """The configured project (cvat.detection.project_name for box rounds) and
+    its {label name: id}, creating the project if needed."""
+    name = ccfg.detection.project_name if boxes else ccfg.project_name
+    project = client.find_project(name)
     if project is None:
-        project = client.create_project(ccfg.project_name, project_labels(ccfg))
-        log.info("Created CVAT project %s (id %s)", ccfg.project_name, project["id"])
+        project = client.create_project(name, project_labels(ccfg, boxes))
+        log.info("Created CVAT project %s (id %s)", name, project["id"])
     label_ids = client.label_ids(project["id"])
-    for label in (ccfg.vegetation_label.name, ccfg.exclude_label.name):
+    for label in required_labels(ccfg, boxes):
         if label not in label_ids:
-            raise ValueError(f"CVAT project {ccfg.project_name!r} has no {label!r} label; add it in CVAT")
+            raise ValueError(f"CVAT project {name!r} has no {label!r} label; add it in CVAT")
     return project, label_ids
 
 
@@ -61,12 +78,14 @@ def main(cfg: DictConfig) -> dict | None:
 
     with LabelLedger(cfg.paths.labels_db) as ledger:
         items = ledger.items_for_task(lcfg.round, "prepared", "push_cvat", lcfg.retry_errors)
+        items = _limit(items, lcfg.get("push_cvat") or {})
         if not items and not ledger.pending_prelabel_tiles(lcfg.round):
             log.info("Nothing to push to CVAT for round %s.", lcfg.round)
             return None
 
+        boxes = is_box_round(lcfg)
         client = CvatClient.from_config(ccfg)
-        project, label_ids = ensure_project(client, ccfg)
+        project, label_ids = ensure_project(client, ccfg, boxes)
 
         summary = {"project_id": project["id"], "images": 0}
         task_name = f"{cfg.project.name}_{cfg.project.subname}"
@@ -85,10 +104,9 @@ def main(cfg: DictConfig) -> dict | None:
                 continue
             by_n_tiles[len(tiles)].append((item, tiles))
         _log_plan(by_n_tiles, ccfg)
-        vegetation_id = label_ids[ccfg.vegetation_label.name]
         # Pre-labels left over from an earlier, interrupted push go first.
         prelabels = _upload_prelabels(client, ledger, source, ledger.pending_prelabel_tiles(lcfg.round),
-                                      vegetation_id, ccfg)
+                                      label_ids, ccfg, boxes)
         tasks = []
         for n_tiles, group in sorted(by_n_tiles.items()):
             task_size = int(ccfg.task_size or len(group))
@@ -97,7 +115,7 @@ def main(cfg: DictConfig) -> dict | None:
                                     group[start:start + task_size], n_tiles)
                 # Each task gets its pre-labels right away, so it's ready to annotate as soon as it appears.
                 pending = [t for t in ledger.pending_prelabel_tiles(lcfg.round) if t["cvat_task_id"] == task["task_id"]]
-                task["prelabels_uploaded"] = _upload_prelabels(client, ledger, source, pending, vegetation_id, ccfg)
+                task["prelabels_uploaded"] = _upload_prelabels(client, ledger, source, pending, label_ids, ccfg, boxes)
                 prelabels += task["prelabels_uploaded"]
                 tasks.append(task)
         if len(tasks) == 1:
@@ -106,6 +124,19 @@ def main(cfg: DictConfig) -> dict | None:
             summary.update(images=sum(t["images"] for t in tasks), tasks=tasks)
         summary["prelabels_uploaded"] = prelabels
     return summary
+
+
+def _limit(items: list[dict], pcfg) -> list[dict]:
+    """label.push_cvat.image_ids (only these) and max_images (at most this many,
+    by image id) hold back the rest of the prepared images for a later push."""
+    image_ids = set(pcfg.get("image_ids") or [])
+    if image_ids:
+        items = [i for i in items if i["image_id"] in image_ids]
+    max_images = pcfg.get("max_images")
+    if max_images is not None and len(items) > int(max_images):
+        log.info("Pushing %d of %d prepared images (label.push_cvat.max_images)", int(max_images), len(items))
+        items = sorted(items, key=lambda i: i["image_id"])[:int(max_images)]
+    return items
 
 
 def _log_plan(by_n_tiles: dict, ccfg) -> None:
@@ -202,8 +233,10 @@ def _assign_jobs(client, jobs, usernames) -> None:
             log.info("Assigned job %s to %s", job["id"], username)
 
 
-def _upload_prelabels(client, ledger, source, tiles, label_id, ccfg) -> int:
-    """Upload the pre-labels of `tiles` (ledger tiles rows, sorted by task)."""
+def _upload_prelabels(client, ledger, source, tiles, label_ids, ccfg, boxes=False) -> int:
+    """Upload the pre-labels of `tiles` (ledger tiles rows, sorted by task):
+    vegetation masks, or with `boxes` one rectangle per box in its JSON."""
+    label_id = label_ids[ccfg.vegetation_label.name] if not boxes else None
     split = ccfg.prelabel_shapes == "components"
     if ccfg.prelabel_shapes not in ("components", "single"):
         raise ValueError(f"cvat.prelabel_shapes must be components or single, not {ccfg.prelabel_shapes!r}")
@@ -219,8 +252,12 @@ def _upload_prelabels(client, ledger, source, tiles, label_id, ccfg) -> int:
         shapes, batch, n_points = [], [], 0
         for tile in task_tiles:
             frame_meta = meta["frames"][tile["cvat_frame"] - start]
-            mask = cv2.imread(tile["prelabel_path"], cv2.IMREAD_GRAYSCALE)
-            if mask is None:
+            mask = None if boxes else cv2.imread(tile["prelabel_path"], cv2.IMREAD_GRAYSCALE)
+            if boxes:
+                new = _box_shapes(tile, label_ids)
+                shapes.extend(new)
+                n_points += sum(len(s["points"]) for s in new)
+            elif mask is None:
                 log.warning("Missing pre-label %s; %s starts empty in CVAT", tile["prelabel_path"], tile["name"])
             else:
                 size = (frame_meta["width"], frame_meta["height"])
@@ -241,6 +278,20 @@ def _upload_prelabels(client, ledger, source, tiles, label_id, ccfg) -> int:
     return uploaded
 
 
+def _box_shapes(tile, label_ids) -> list[dict]:
+    """CVAT rectangles of a tile's boxes/ JSON (each box's bbox_cvat)."""
+    path = Path(tile["prelabel_path"])
+    if not path.exists():
+        log.warning("Missing pre-label %s; %s starts empty in CVAT", path, tile["name"])
+        return []
+    shapes = []
+    for box in json.loads(path.read_text())["instances"]:
+        if box["label"] not in label_ids:
+            raise ValueError(f"{path.name}: label {box['label']!r} is not in the CVAT project")
+        shapes.append(rectangle_shape(box["bbox_cvat"], tile["cvat_frame"], label_ids[box["label"]]))
+    return shapes
+
+
 def _send(client, ledger, source, task_id, shapes, tiles) -> int:
     if shapes:
         client.add_task_annotations(task_id, shapes)
@@ -248,6 +299,6 @@ def _send(client, ledger, source, task_id, shapes, tiles) -> int:
         ledger.update_tile(source, tile["image_id"], tile["name"], cvat_prelabel_uploaded=1)
     for image_id in {t["image_id"] for t in tiles}:
         ledger.update(source, image_id, cvat_prelabel_uploaded=1)
-    log.info("Uploaded %d pre-label masks to task %s (%.1f MB of points)",
+    log.info("Uploaded %d pre-label shapes to task %s (%.1f MB of points)",
              len(shapes), task_id, len(json.dumps(shapes)) / 1e6 if shapes else 0.0)
     return len(shapes)

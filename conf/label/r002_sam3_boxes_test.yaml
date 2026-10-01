@@ -1,0 +1,45 @@
+# @package _global_
+# Small SAM 3 box round on the AgIR v2 sample300 images: a push test for
+# label.prelabel.kind=sam3_boxes. Run it in its own project (ledger and run
+# folder), since all 300 images are already in vegetation_001's rounds; that has
+# to be on the command line, as config.yaml's project block wins over this file:
+#   python main.py mode=label label=r002_sam3_boxes_test project.name=sam3_boxes_test
+defaults:
+  - default@label
+  - _self_
+
+label:
+  round: r002_sam3_boxes_test
+  source: semif
+  select:
+    n_images: 10            # topped up: 5 more images -> a second task
+    balance_by: []
+  prepare:
+    split: false            # box rounds upload the downscaled image
+  prelabel:
+    kind: sam3_boxes
+    cuda_visible_devices: [0]
+
+proposals:                  # SAM 3 prompts -> detection class (cvat.detection.labels: 1 plant, 2 colorchecker)
+  prompts: [plant, grass, color chart]   # "color chart" finds each colorchecker panel; "color calibration card" also hits the marker cards
+  prompt_labels: {color chart: 2}        # plant and grass: pseudo_labels.default_label (1)
+
+sources:
+  semif:
+    db: ${paths.persistent_dir}/outputs/source_db/agir_v2_sample300.db   # built from agir_v2_sample300.csv
+    snapshot: "off"
+    roots:
+      - name: agir_v2_sample300
+        local_path: /mnt/globus/MK_test/agir_v2_sample300
+        endpoint: null
+        endpoint_path: null
+
+transfer:
+  backend: copy
+
+cvat:
+  task_size: 5
+  segment_size: 5
+  delete_frames_after_push: false   # keep images/ to compare with what CVAT shows
+  detection:
+    project_name: semif_plant_boxes_test

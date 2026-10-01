@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS items (
     cvat_width             INTEGER,
     cvat_height            INTEGER,
     scale                  REAL,           -- cvat_width / native_width
-    prelabel_path          TEXT,           -- model mask at CVAT resolution (masks/)
+    prelabel_path          TEXT,           -- model mask at CVAT resolution (masks/), or SAM 3 boxes (boxes/)
     globus_task_id         TEXT,
     cvat_task_id           INTEGER,
     cvat_job_id            INTEGER,
@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS items (
     cvat_prelabel_uploaded INTEGER NOT NULL DEFAULT 0,
     mask_path              TEXT,           -- human mask at CVAT resolution (cvat_downloads/<task>/masks/)
     changed_frac           REAL,           -- fraction of pixels the annotator changed vs the prelabel
+    boxes_path             TEXT,           -- human boxes, full resolution (cvat_downloads/<task>/boxes/)
     split                  TEXT,           -- train | val | test, assigned once by build_dataset
     error                  TEXT,
     created_at             TEXT NOT NULL,
@@ -78,7 +79,7 @@ CREATE TABLE IF NOT EXISTS tiles (
     cvat_image_path        TEXT NOT NULL,  -- the file uploaded to CVAT (images/)
     cvat_width             INTEGER,
     cvat_height            INTEGER,
-    prelabel_path          TEXT,           -- pre-label at CVAT resolution (masks/)
+    prelabel_path          TEXT,           -- pre-label at CVAT resolution (masks/ or boxes/)
     cvat_task_id           INTEGER,
     cvat_job_id            INTEGER,
     cvat_frame             INTEGER,
@@ -87,6 +88,9 @@ CREATE TABLE IF NOT EXISTS tiles (
     FOREIGN KEY (source, image_id) REFERENCES items(source, image_id)
 );
 """
+
+# Columns added after the first ledgers were made: name -> type.
+_ADDED_COLUMNS = {"boxes_path": "TEXT"}
 
 # Ledgers from before `tiles` existed: each prepared image was one frame.
 _MIGRATE = """
@@ -112,7 +116,7 @@ _UPDATABLE = {
     "native_path", "native_width", "native_height",
     "cvat_image_path", "cvat_width", "cvat_height", "scale", "prelabel_path",
     "globus_task_id", "cvat_task_id", "cvat_job_id", "cvat_frame", "cvat_prelabel_uploaded",
-    "mask_path", "changed_frac", "split", "error",
+    "mask_path", "changed_frac", "boxes_path", "split", "error",
 }
 
 
@@ -128,6 +132,10 @@ class LabelLedger:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.executescript(_SCHEMA)
+        columns = {r["name"] for r in self.conn.execute("PRAGMA table_info(items)")}
+        for name, kind in _ADDED_COLUMNS.items():
+            if name not in columns:
+                self.conn.execute(f"ALTER TABLE items ADD COLUMN {name} {kind}")
         self.conn.executescript(_MIGRATE)
 
     def close(self) -> None:

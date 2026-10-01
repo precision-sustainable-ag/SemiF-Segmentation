@@ -89,11 +89,11 @@ def save_preview(path: Path, image: np.ndarray, boxes: np.ndarray, max_side: int
     cv2.imwrite(str(path), cv2.cvtColor(view, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 90])
 
 
-def box_image(generator, row: dict, scfg: dict) -> tuple[dict, np.ndarray]:
-    """(JSON record of one image's instances, the image at the working scale)."""
-    fcfg, tcfg = scfg["full_image"], scfg["tiling"]
-    scale = float(fcfg["scale"])
-    full_hw, image, semantic = load_scaled(row["image_path"], row["mask_path"], scale)
+def predict_instances(generator, image: np.ndarray, semantic, full_hw: tuple[int, int], scfg: dict) -> list[dict]:
+    """Instances of one image, given at the working scale (RGB, and its label
+    mask or None), best first: bbox at full resolution full_hw, bbox_scaled,
+    score, label, area_scaled."""
+    tcfg = scfg["tiling"]
     inst = generator.predict_tiled(image, semantic, tcfg["tile_size"], tcfg["overlap"], tcfg["merge_iou"])
     if semantic is not None and scfg["pseudo_labels"].get("clip_to_semantic", True):
         inst = clip_instances_to_semantic(inst, semantic, scfg["filtering"].get("ignore_value"),
@@ -101,7 +101,7 @@ def box_image(generator, row: dict, scfg: dict) -> tuple[dict, np.ndarray]:
     order = np.argsort(-inst.scores) if len(inst) else np.zeros(0, np.int64)
     full_boxes = rescale_boxes(inst.boxes[order], image.shape[:2], full_hw) if len(inst) else np.zeros((0, 4))
     areas = inst.areas()[order] if len(inst) else []
-    instances = [{
+    return [{
         "id": k + 1,
         "bbox": [round(float(v), 1) for v in full_boxes[k]],
         "bbox_scaled": [int(v) for v in inst.boxes[i]],
@@ -109,6 +109,13 @@ def box_image(generator, row: dict, scfg: dict) -> tuple[dict, np.ndarray]:
         "label": int(inst.labels[i]),
         "area_scaled": int(areas[k]),
     } for k, i in enumerate(order)]
+
+
+def box_image(generator, row: dict, scfg: dict) -> tuple[dict, np.ndarray]:
+    """(JSON record of one image's instances, the image at the working scale)."""
+    scale = float(scfg["full_image"]["scale"])
+    full_hw, image, semantic = load_scaled(row["image_path"], row["mask_path"], scale)
+    instances = predict_instances(generator, image, semantic, full_hw, scfg)
     return {
         "image_id": row["image_id"],
         "split": row["split"],

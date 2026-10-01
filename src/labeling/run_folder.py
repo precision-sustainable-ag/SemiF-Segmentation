@@ -15,9 +15,13 @@ run, with project.subname = label.round:
                              e.g. semifield-developed-images/<batch>/images/<image_id>.jpg
     images/<image_id>.jpg    prepare: the downscaled copy uploaded to CVAT
     masks/<image_id>.png     prepare: the model pre-label uploaded with it (0/255)
+    boxes/<image_id>.json    prepare, in box rounds (label.prelabel.kind=sam3_boxes): the SAM 3
+                             boxes uploaded with it as rectangles, full resolution and CVAT frame
     cvat_downloads/<task>/   pull_cvat: annotations/job_<id>.json as CVAT returned them, and
                              the human masks (0/1): cvat_masks/<image_id>.png at CVAT resolution,
-                             masks/<image_id>.png scaled to the full-resolution image
+                             masks/<image_id>.png scaled to the full-resolution image; in box
+                             rounds boxes/<image_id>.json, the corrected boxes at full resolution
+                             with their label and provenance (sam3, sam3_corrected, human)
     manifest.csv             one row per image: status, paths, CVAT task/job/frame
     metrics.json             status counts and each task's latest summary
 
@@ -70,6 +74,7 @@ MANIFEST_COLUMNS = {
     "cvat_frame": "cvat_frame",
     "mask_path": "mask_path",
     "changed_frac": "changed_frac",
+    "boxes_path": "boxes_path",
     "split": "split",
     "error": "error",
     "updated_at": "updated_at",
@@ -87,6 +92,7 @@ class RunFolder:
         self.transfer_manifest = self.root / "transfer_manifest.json"
         self.images = self.root / "images"
         self.masks = self.root / "masks"
+        self.boxes = self.root / "boxes"
         self.cvat_downloads = self.root / "cvat_downloads"
         self.manifest = self.root / "manifest.csv"
         self.metrics = self.root / "metrics.json"
@@ -157,6 +163,7 @@ def write_cfg(cfg: DictConfig, run: RunFolder) -> dict:
         "query": str(run.query),
         "images": str(run.images),
         "masks": str(run.masks),
+        "boxes": str(run.boxes),
         "cvat_downloads": str(run.cvat_downloads),
         "cfg_path": str(run.cfg),
         "manifest_path": str(run.manifest),

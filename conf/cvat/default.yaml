@@ -8,6 +8,12 @@ project_name: semif_vegetation
 vegetation_label: {name: vegetation, color: "#33cc33"}  # masks or polygons
 exclude_label: {name: exclude, color: "#ff3333"}        # frame tag: leave this image out of the dataset
 
+detection:                # box rounds (label.prelabel.kind=sam3_boxes): rectangles, in their own project
+  project_name: semif_plant_boxes
+  labels:                 # detection class (proposals prompt_labels / pseudo_labels.default_label) -> CVAT label
+    - {id: 1, name: plant, color: "#ff00ff"}  # magenta: stands out on green plants and brown soil
+    - {id: 2, name: colorchecker, color: "#00ffff"}  # cyan
+
 segment_size: 10          # images per job
 task_size: null           # images per task; null puts the whole push in one task
 delete_frames_after_push: true  # delete the run folder's images/ files once their task is set up in CVAT

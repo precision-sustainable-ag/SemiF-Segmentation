@@ -500,3 +500,18 @@ def test_push_cvat_logs_the_plan_before_creating_tasks(split_cfg, monkeypatch, c
     assert plan.splitlines()[0] == "Push plan: 3 images (12 frames) -> 2 tasks, 3 jobs"
     assert "4 frame(s) per image: 3 images -> 2 tasks (2, 1 images), 3 jobs of up to 1 images (4 frames)" in plan
     assert len(summary["tasks"]) == 2 and sum(t["jobs"] for t in summary["tasks"]) == 3
+
+
+def test_push_cvat_holds_back_images_over_max_images(flow_cfg, monkeypatch):
+    cfg = flow_cfg
+    fake = FakeCvat()
+    monkeypatch.setattr(CvatClient, "from_config", classmethod(lambda cls, ccfg: fake))
+    select.main(cfg)
+    fetch.main(cfg)
+    prepare.main(cfg)
+    OmegaConf.update(cfg, "label.push_cvat.image_ids", ["IMG2", "IMG0"])
+    OmegaConf.update(cfg, "label.push_cvat.max_images", 1)
+    assert push_cvat.main(cfg)["images"] == 1
+    assert {k: i["status"] for k, i in statuses(cfg).items()} == {"IMG0": "in_cvat", "IMG1": "prepared", "IMG2": "prepared"}
+    OmegaConf.update(cfg, "label.push_cvat", {"max_images": None, "image_ids": []})
+    assert push_cvat.main(cfg)["images"] == 2
