@@ -1,0 +1,39 @@
+# Databases a labeling round can select images from (label.source).
+#
+# snapshot: auto   - query a local copy (paths.source_db_dir), re-copied when the source file changes
+#           always - re-copy on every run
+#           off    - query the DB in place, read-only
+#
+# roots: where the images a DB row points to live. Each maps a directory as the
+# DB sees it (local_path, when mounted on this machine) to a Globus collection
+# (endpoint, a key in transfer.globus.endpoints) and the same directory's path on
+# that collection (endpoint_path). Only the Globus backend needs endpoint/endpoint_path.
+# Fetched files keep their path below the root inside the round's run folder.
+
+semif:
+  db: /mnt/research-projects/s/screberg/longterm_images2/semifield-database/AgIR_DB_v2_0_202609.db
+  snapshot: auto
+  # image_path is relative (semifield-developed-images/<batch>/images/<id>.jpg); roots are tried in order.
+  roots:
+    - name: screberg_longterm_images2
+      local_path: /mnt/research-projects/s/screberg/longterm_images2
+      endpoint: ncsu_screberg
+      endpoint_path: null
+    - name: screberg_longterm_images
+      local_path: /mnt/research-projects/s/screberg/longterm_images
+      endpoint: ncsu_screberg
+      endpoint_path: null
+    - name: juno
+      local_path: null     # not mounted here; reachable only through Globus
+      endpoint: juno
+      endpoint_path: /LTS/project/dash_agir   # AgIR's cutouts live under here; developed images unconfirmed
+
+field:
+  db: /mnt/research-projects/r/raatwell/longterm_images3/field-db/field_exploration.db
+  snapshot: auto
+  # file_locations.path is absolute, under this root's local_path.
+  roots:
+    - name: raatwell_longterm_images3
+      local_path: /mnt/research-projects/r/raatwell/longterm_images3
+      endpoint: ncsu_raatwell
+      endpoint_path: null

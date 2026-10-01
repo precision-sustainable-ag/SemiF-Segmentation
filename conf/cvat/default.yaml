@@ -1,0 +1,25 @@
+# CVAT cloud, reached over REST and scoped to one organization.
+# org_id falls back to cvat.org_id in the credentials file (and url to cvat.url if set to null).
+url: https://app.cvat.ai
+org_id: null
+credentials_file: ${paths.persistent_dir}/.keys/keys.yaml   # cvat.username + cvat.password, or cvat.token
+
+project_name: semif_vegetation
+vegetation_label: {name: vegetation, color: "#33cc33"}  # masks or polygons
+exclude_label: {name: exclude, color: "#ff3333"}        # frame tag: leave this image out of the dataset
+
+segment_size: 10          # images per job
+task_size: null           # images per task; null puts the whole push in one task
+delete_frames_after_push: true  # delete the run folder's images/ files once their task is set up in CVAT
+prelabel_shapes: components  # components: one mask shape per connected blob | single: one shape per image
+prelabel_min_area_px: 64     # with components, drop blobs smaller than this (at CVAT resolution)
+image_quality: 95         # quality of the compressed chunks CVAT shows annotators
+upload_batch_mb: 90       # size of one bulk upload request (CVAT's limit is 100 MiB)
+assignees: []             # CVAT usernames; new jobs are assigned round-robin
+
+pull_when:                # pull a job once it matches both (null = any)
+  state: completed        # new | in progress | rejected | completed
+  stage: null             # annotation | validation | acceptance
+
+request_timeout_s: 300
+poll_seconds: 5

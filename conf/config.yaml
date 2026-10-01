@@ -1,18 +1,23 @@
 defaults:
   - paths: default           # Default paths config
-  - query: vegetation           # Default query config
   - preprocess: default          # Default training config
-  - augment: default  # Default augmentations config
+  - augment: color_invariant     # Default augmentations config
   - model: deeplabv3plus         # Model config (segformer, deeplabv3plus)
   - train: default         # Train config
   - inference: default      # Inference config
-  
+  - sources: default        # Source DBs for labeling rounds (AgIR v2, field_exploration)
+  - transfer: default       # How label fetch moves images (Globus endpoints and paths)
+  - cvat: default           # CVAT server, organization, and project
+  - label: default          # Labeling round (select one with label=<round>)
+
   - _self_                   # Ensures overriding behavior
 
 project:
   name: vegetation_001 #test_gh_actions_001 #test_gh_actions_001, hairy_vetch_001
+  # Labeling rounds use AgIR-CVToolkit's run folders, outputs/runs/<name>/<subname>/
+  subname: ${label.round}
 
-mode: ??? # required argument for command line. Either sync, query, preprocess, train, or inference
+mode: ??? # required argument for command line. Either sync, label, preprocess, train, or inference
 
 job_now_date: &nowdir ${now:%Y-%m-%d}
 job_now_time: &nowtime ${now:%H:%M:%S}
@@ -20,5 +25,6 @@ job_now_time: &nowtime ${now:%H:%M:%S}
 
 hydra:
   run:
-    dir: ${paths.project_mode_dir}/hydra/${job_now_date}_${job_now_time}  # Dynamically set the directory based on task
+    # mode=label: logs/hydra/ in the round's run folder; other modes: outputs/runs/<name>/<mode>/hydra/
+    dir: ${oc.select:paths.hydra_dirs.${mode},${paths.project_mode_dir}/hydra}/${job_now_date}_${job_now_time}
   # output_subdir: "default"

@@ -1,111 +1,23 @@
 """
-This script ensures that local model and metadata files are up-to-date with their remote counterparts. 
-It compares files based on their SHA-256 hash. If a local file is missing or differs from the remote 
-version, it is automatically downloaded and updated.
+Refreshes the local snapshots of the source databases that labeling rounds
+select from (conf/sources). `select` already snapshots its own source when
+needed; this mode refreshes all of them at once, e.g. after a new DB release.
 """
 
-import hashlib
 import logging
-import shutil
-import subprocess
-from pathlib import Path
 
-import hydra
 from omegaconf import DictConfig
+
+from src.labeling.snapshot import source_db_path
 
 log = logging.getLogger(__name__)
 
-def compute_file_hash(filepath: Path, chunk_size: int = 65536) -> str:
-    """
-    Compute SHA-256 hash for a file.
-    Returns:
-        str: The hexadecimal representation of the file's SHA-256 hash.
-    """
-    hash_func = hashlib.sha256()
-    with filepath.open("rb") as f:
-        for chunk in iter(lambda: f.read(chunk_size), b""):
-            hash_func.update(chunk)
-    return hash_func.hexdigest()
 
-def files_are_identical(local_file: Path, remote_file: Path) -> bool:
-    """
-    Compare hash of local and remote files to determine if they are identical.
-    Returns:
-        bool: True if both files exist and have identical hashes, False otherwise.
-    """
-    if not local_file.exists() or not remote_file.exists():
-        log.error(f"Missing file: {local_file} or {remote_file}")
-        return False
-
-    local_hash = compute_file_hash(local_file)
-    remote_hash = compute_file_hash(remote_file)
-    
-    return local_hash == remote_hash
-
-def update_file(local_file: Path, remote_file: Path):
-    """Replace the local file with the remote file if they are different."""
-    try:
-        log.info(f"Updating {local_file} from {remote_file}")
-        local_file.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(remote_file, local_file)
-        log.info(f"Update complete: {local_file}")
-    except Exception as e:
-        log.error(f"Failed to update {local_file}: {e}")
-
-@hydra.main(version_base="1.3", config_path="../conf", config_name="config")
 def main(cfg: DictConfig) -> None:
-    """
-    Checks if local files are up to date compared to their remote versions,
-    and updates them if necessary.
-    """
-    model_files = {
-        "db": {
-            "local": Path(cfg.paths.db.db_file),
-            "remote": Path(cfg.paths.db.lts_db_file),
-        },
-        "species_info": {
-            "local": Path(cfg.paths.species_info_file),
-            "remote": Path(cfg.paths.lts_species_info),
-        }
-    }
-    try:
-        species_info_updated = False
-        for name, paths in model_files.items():
-            local = paths["local"]
-            remote = paths["remote"]
-
-            if not remote.exists():
-                log.error(f"Remote file {remote} does not exist, skipping.")
-                continue
-            
-            if not local.exists():
-                log.warning(f"Local file {local} does not exist. Downloading...")
-                update_file(local, remote)
-                if name == "species_info":
-                    species_info_updated = True
-                continue
-            
-            log.info(f"Comparing {name} files...")
-            if files_are_identical(local, remote):
-                log.info(f"{name}: Local file is up-to-date.")
-            else:
-                log.warning(f"Local {name} is outdated or different from the remote version. Updating...")
-                update_file(local, remote)
-                if name == "species_info":
-                    species_info_updated = True
-        
-        # If species_info was updated, regenerate class_groupings.py
-        if species_info_updated:
-            log.info("species_info.json was updated. Regenerating class_groupings.py...")
-            # You can either call your function directly here, or run the script:
-            subprocess.run(["python", f"{cfg.paths.species_info_dir}/update_class_groupings.py", f"{cfg.paths.species_info_dir}/species_info.json", f"{cfg.paths.utils_dir}/class_groupings.py"], check=True)
-
-    except Exception as e:
-        log.error(f"An error occurred while syncing files: {e}")
-        raise
-    
+    for name, source in cfg.sources.items():
+        if source.snapshot == "off":
+            log.info(f"{name}: snapshot is off, queried in place ({source.db})")
+            continue
+        path = source_db_path(source.db, cfg.paths.source_db_dir, source.snapshot)
+        log.info(f"{name}: {path}")
     log.info("File synchronization complete.")
-    return
-
-if __name__ == "__main__":
-    main()

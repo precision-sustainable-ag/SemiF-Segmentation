@@ -1,5 +1,4 @@
 from pathlib import Path
-import hydra
 from omegaconf import DictConfig
 import logging
 import numpy as np
@@ -7,9 +6,6 @@ import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import json
-from src.utils.class_groupings import CLASSGROUPS
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import Manager
 from concurrent.futures import ProcessPoolExecutor
 
 log = logging.getLogger(__name__)
@@ -40,9 +36,9 @@ def process_image(image_file):
     return mean, squared_mean, num_pixels
 
 
-def calculate_rgb_mean_std_shared(image_files, num_workers=4):
+def calculate_rgb_mean_std(image_files, num_workers=4):
     """
-    Calculate the RGB mean and standard deviation using a shared list for multiprocessing.
+    Calculate the RGB mean and standard deviation over a list of images.
 
     Args:
         image_files (list): List of image file paths.
@@ -51,39 +47,28 @@ def calculate_rgb_mean_std_shared(image_files, num_workers=4):
     Returns:
         tuple: Mean and standard deviation as numpy arrays.
     """
-    # Use Manager to create a shared list
-    with Manager() as manager:
-        shared_list = manager.list()
+    total_mean = np.zeros(3, dtype=np.float64)
+    total_squared_mean = np.zeros(3, dtype=np.float64)
+    total_pixels = 0
 
-        # Use ProcessPoolExecutor for parallel processing
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
-            futures = {executor.submit(process_image, image_file): image_file for image_file in image_files}
-
-            # Collect results
-            for future in tqdm(futures, desc="Processing images"):
-                result = future.result()
-                if result is not None:
-                    shared_list.append(result)
-
-        # Aggregate results from the shared list
-        total_mean = np.zeros(3, dtype=np.float64)
-        total_squared_mean = np.zeros(3, dtype=np.float64)
-        total_pixels = 0
-
-        for mean, squared_mean, num_pixels in shared_list:
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        results = executor.map(process_image, image_files, chunksize=16)
+        for result in tqdm(results, total=len(image_files), desc="Processing images"):
+            if result is None:
+                continue
+            mean, squared_mean, num_pixels = result
             total_mean += mean * num_pixels
             total_squared_mean += squared_mean * num_pixels
             total_pixels += num_pixels
 
-        # Calculate overall mean and std
-        overall_mean = total_mean / total_pixels
-        overall_std = np.sqrt((total_squared_mean / total_pixels) - overall_mean**2)
-
+    overall_mean = total_mean / total_pixels
+    overall_std = np.sqrt((total_squared_mean / total_pixels) - overall_mean**2)
     return overall_mean, overall_std
+
 
 def save_mean_std(mean, std, output_file):
     """
-    Save mean and std to a text file.
+    Save mean and std to a JSON file.
 
     Args:
         mean (numpy.ndarray): RGB mean values.
@@ -95,140 +80,97 @@ def save_mean_std(mean, std, output_file):
         json.dump(data, f, indent=4)
     log.info(f"Saved RGB mean and std to {output_file}")
 
-def process_mask(mask_file):
+
+def count_mask_pixels(mask_file):
     """
-    Process a single mask to extract unique values and class frequencies.
+    Count pixels per mask value in a single mask.
 
     Args:
         mask_file (Path): Path to the mask file.
 
     Returns:
-        tuple: Set of unique values and a dictionary of class frequencies.
+        dict: {mask value: pixel count}
     """
     mask = cv2.imread(str(mask_file), cv2.IMREAD_GRAYSCALE)  # Load mask as grayscale
     if mask is None:
         log.warning(f"Could not load mask: {mask_file}")
-        return set(), {}
-
-    unique_values, counts = np.unique(mask, return_counts=True)
-    class_frequencies = dict(zip(unique_values, counts))
-    return set(unique_values), class_frequencies
+        return {}
+    values, counts = np.unique(mask, return_counts=True)
+    return {int(v): int(c) for v, c in zip(values, counts)}
 
 
-def process_masks(mask_files, num_workers=12):
+def count_split_pixels(mask_files, num_workers=12):
     """
-    Process multiple masks to extract unique values and class frequencies concurrently.
+    Pixel counts per mask value over all masks of a split.
 
     Args:
         mask_files (list): List of mask file paths.
         num_workers (int): Number of worker processes.
 
     Returns:
-        tuple: Combined set of unique values and combined class frequencies dictionary.
+        dict: {mask value: pixel count}
     """
-    combined_unique_values = set()
-    combined_class_frequencies = {}
-
+    totals = {}
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        results = list(tqdm(executor.map(process_mask, mask_files), total=len(mask_files), desc="Processing masks"))
-
-    for unique_values, class_frequencies in results:
-        combined_unique_values.update(unique_values)
-        for value, count in class_frequencies.items():
-            combined_class_frequencies[value] = combined_class_frequencies.get(value, 0) + count
-
-    return combined_unique_values, combined_class_frequencies
-
-def plot_class_distributions(class_frequencies, title, group_name, output_dir=None):
-    classes = list(class_frequencies.keys())
-    frequencies = list(class_frequencies.values())
-
-    clsint_to_str = {cls_value: str_cls for str_cls, cls_dict in CLASSGROUPS[group_name].items() for cls_value in classes if cls_value == cls_dict["values"]}
-
-    class_names = [clsint_to_str[cls] for cls in classes]
-
-    plt.figure(figsize=(10, 5))
-    plt.bar(class_names, frequencies)
-    plt.xlabel('Classes')
-    plt.gca().get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
-    plt.ylabel('Frequencies')
-    plt.title(title)
-    plt.xticks(class_names)
-    if output_dir:
-        filename = title.lower().replace(' ', '_') + '.png'
-        plt.savefig(output_dir / filename)
+        for counts in tqdm(executor.map(count_mask_pixels, mask_files, chunksize=16), total=len(mask_files), desc="Processing masks"):
+            for value, count in counts.items():
+                totals[value] = totals.get(value, 0) + count
+    return totals
 
 
+def plot_class_distributions(pixel_counts, class_names, output_file):
+    """
+    Bar plot of the fraction of pixels in each class, per split.
+    """
+    splits = list(pixel_counts)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    width = 0.8 / max(len(splits), 1)
+    for i, split in enumerate(splits):
+        total = sum(pixel_counts[split].values()) or 1
+        fractions = [pixel_counts[split].get(value, 0) / total for value in range(len(class_names))]
+        ax.bar(np.arange(len(class_names)) + i * width, fractions, width, label=split)
+    ax.set_xticks(np.arange(len(class_names)) + width * (len(splits) - 1) / 2)
+    ax.set_xticklabels(class_names)
+    ax.set_ylabel("Fraction of pixels")
+    ax.set_title("Mask class distribution")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_file)
+    plt.close(fig)
 
-@hydra.main(version_base="1.3", config_path="../conf", config_name="config")
+
 def main(cfg: DictConfig):
     log.info("Starting data statistics calculation...")
-    data_stats_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "data_stats"
-    split_dir = Path(cfg.paths.split_dir)
-    train_image_dir = split_dir / "train" / "images"
-    train_remapped_mask_dir = split_dir / "train" / "masks"
-    val_remapped_mask_dir = split_dir / "val" / "masks"
-    test_remapped_mask_dir = split_dir / "test" / "masks"
-    output_dir = Path(cfg.paths.project_mode_dir) / "data" / "data_stats"
+    output_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "data_stats"
     output_dir.mkdir(parents=True, exist_ok=True)
-    group_name = cfg.preprocess.remap_masks.group_name
+    split_dir = Path(cfg.paths.split_dir)
+    workers = cfg.preprocess.data_stats.workers
 
-    # Get image files for mean and std calculation
-    train_image_files = list(train_image_dir.glob("*.jpg"))
-
-    # Calculate and save RGB mean and std
-    mean, std = calculate_rgb_mean_std_shared(train_image_files, num_workers=18)
+    # Calculate and save RGB mean and std over the training tiles
+    train_image_files = list((split_dir / "train" / "images").glob("*.jpg"))
+    mean, std = calculate_rgb_mean_std(train_image_files, num_workers=workers)
     log.info(f"Calculated Mean: {mean}, Std: {std}")
-    # Save results
-    output_file = data_stats_dir / "rgb_mean_std.json"
-    save_mean_std(mean, std, output_file)
+    save_mean_std(mean, std, output_dir / "rgb_mean_std.json")
 
-    # Process masks
-    train_mask_files = list(train_remapped_mask_dir.glob("*.png"))
-    val_mask_files = list(val_remapped_mask_dir.glob("*.png"))
-    test_mask_files = list(test_remapped_mask_dir.glob("*.png"))
+    # Pixel counts per class and split
+    pixel_counts = {}
+    for split in ("train", "val", "test"):
+        mask_files = list((split_dir / split / "masks").glob("*.png"))
+        if mask_files:
+            log.info(f"Processing {split} masks...")
+            pixel_counts[split] = count_split_pixels(mask_files, num_workers=workers)
 
-    # Process masks
-    log.info("Processing training masks...")
-    train_unique_values, train_class_frequencies = process_masks(train_mask_files, num_workers=18)
+    class_names = list(cfg.train.class_names)
+    unexpected = {value for counts in pixel_counts.values() for value in counts if value >= len(class_names)}
+    if unexpected:
+        log.warning(f"Mask values {sorted(unexpected)} have no entry in train.class_names {class_names}")
 
-    log.info("Processing validation masks...")
-    val_unique_values, val_class_frequencies = process_masks(val_mask_files, num_workers=18)
+    for split, counts in pixel_counts.items():
+        total = sum(counts.values())
+        summary = ", ".join(f"{class_names[v] if v < len(class_names) else v}: {c / total:.1%}" for v, c in sorted(counts.items()))
+        log.info(f"{split} pixels: {summary}")
 
-    log.info("Processing test masks...")
-    test_unique_values, test_class_frequencies = process_masks(test_mask_files, num_workers=18)
-    
-    if cfg.preprocess.data_stats.ignore_background:
-        train_class_frequencies.pop(0, None)
-        val_class_frequencies.pop(0, None)
-        test_class_frequencies.pop(0, None)
-
-    log.info(f"Unique values in training masks: {train_unique_values}")
-    log.info(f"Class frequencies in training masks: {train_class_frequencies}")
-
-    log.info(f"Unique values in validation masks: {val_unique_values}")
-    log.info(f"Class frequencies in validation masks: {val_class_frequencies}")
-
-    log.info(f"Unique values in test masks: {test_unique_values}")
-    log.info(f"Class frequencies in test masks: {test_class_frequencies}")
-
-
-    log.info(f"Class frequencies in training masks: {train_class_frequencies}")
-    log.info(f"Class frequencies in validation masks: {val_class_frequencies}")
-    log.info(f"Class frequencies in test masks: {test_class_frequencies}")
-
-    plot_class_distributions(train_class_frequencies, 'Training Mask Class Distribution', group_name, output_dir)
-    plot_class_distributions(val_class_frequencies, 'Validation Mask Class Distribution', group_name, output_dir)
-    plot_class_distributions(test_class_frequencies, 'Test Mask Class Distribution', group_name, output_dir)
-
-
-    combined_class_frequencies = {
-        value: train_class_frequencies.get(value, 0) + val_class_frequencies.get(value, 0) + test_class_frequencies.get(value, 0)
-        for value in set(train_class_frequencies) | set(val_class_frequencies) | set(test_class_frequencies)
-    }
-
-    plot_class_distributions(combined_class_frequencies, 'Combined Mask Class Distribution', group_name, output_dir=output_dir)
-
-
-if __name__ == "__main__":
-    main()
+    with open(output_dir / "class_pixel_counts.json", "w") as f:
+        json.dump(pixel_counts, f, indent=4)
+    plot_class_distributions(pixel_counts, class_names, output_dir / "class_distribution.png")
+    log.info(f"Saved class pixel counts and plot to {output_dir}")

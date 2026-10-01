@@ -1,44 +1,23 @@
+# Builds the training set from the human labels in labels.db (mode=label).
 tasks:
-  find_images: true
-  remove_nontargets: true # If true, only moves synthetic masks if use_synthetic is true
-  grid_crop: true # successfully tested
-  remap_masks: true # successfully tested
-  train_val_test_split: true # successfully tested
-  
-  data_stats: true # successfully tested
-  viz_results: false
+  build_dataset: true   # assign train/val/test per image (kept forever) and write the manifest
+  tile: true            # cut images and masks into tiles at tile.scale
+  data_stats: true      # RGB mean/std of the train tiles + class pixel balance
 
-use_synthetic:
-  enable: false
-  project_name: hairy_vetch
-  sub_project:  # ignored if use_all_subprojects is true
-  use_all_subprojects: true
-
-remove_nontargets:
-  remove_colorchecker: True
-
-grid_crop:
-  crop_height: 1024
-  crop_width: 1024
-
-remap_masks:
-  group_name: vegetation # must be one of "family", "order", "genus", "subclass", "growth_habit", "group", "vegetation"
-  process_concurrently: False
-
-train_val_test_split:
-  train_size:  # not used, train_size is calculated from val_size and test_size
+build_dataset:
   val_size: 0.1
   test_size: 0.1
+  group_by: batch       # image | batch | location: images in one group always share a split
+  sources: []           # limit to these sources (empty = all)
+  rounds: []            # limit to these rounds (empty = all)
+
+tile:
+  scale: 0.5            # fraction of native resolution to train at; inference.rescale_factor follows it
+  tile_size: 1024
+  overlap: 0
+  keep_background: 1.0  # fraction of background-only tiles to keep
   seed: 42
-  use_concurrency: True
-  remove_cropped_data: True
-  
-  model_testing: # quick and dirty way to generate a small dataset, not recommended for final results
-    status: false
-    factor: 0.01
+  workers: 16
 
 data_stats:
-  ignore_background: False # True ignores the background class for plotting
-
-viz_results:
-  model_dir_n:  # model subdirectory to visualize
+  workers: 16

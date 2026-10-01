@@ -1,24 +1,17 @@
 tasks:
-  get_dataset: false
   inference: true
-
-get_dataset:
-  query: true
-  collect_paths: true
-  sample_size: 10
-  images: true
-  metadata: true
-  masks: false
 
 inference:
   explicit_img_dir:
     enable: true
-    img_dir: data/rye_vetch/biomass-data/images
+    img_dir: data/non_green_Field_sample
+    # img_dir: data/rye_vetch/biomass-data/images
   bbox_crop: false # Not compatible with synthetic data
-  inference_subname: test_set
-  version: 2 # Uses cfg.project.name to find the model
-  rescale_factor: 1.0
-  threshold: 0.5
+  inference_subname: non_green_Field_sample
+  # inference_subname: hairy_vetch_pm3d
+  version: 1 # Uses cfg.project.name to find the model
+  rescale_factor: ${preprocess.tile.scale} # match the scale the model was trained at
+  threshold: 0.95
   use_normalization: true
   cuda_visible_devices: [9]
   seed: 422
@@ -26,7 +19,7 @@ inference:
   plot:
     overlays: false
     comparisons: false
-    image_and_mask: true
+    image_and_mask: false
     dpi: 300
     transparent: true
 

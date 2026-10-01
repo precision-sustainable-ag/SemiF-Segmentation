@@ -447,8 +447,9 @@ class InferenceRunner:
         pd.DataFrame(stats).to_csv(self.output_dir / "inference_times.csv", index=False)
         log.info(f"Saved all predictions and stats to {self.output_dir}")
 
-def copy_hydra_config(cfg):
-    target = Path(cfg.paths.inference_output_dir) / ".hydra"
+def copy_hydra_config(output_dir: Path):
+    """Keep the run's config (threshold, checkpoint, ...) next to its predictions."""
+    target = Path(output_dir) / ".hydra"
     source = Path(HydraConfig.get().run.dir) / ".hydra"
     if source.exists():
         shutil.copytree(source, target, dirs_exist_ok=True)
@@ -458,8 +459,9 @@ def copy_hydra_config(cfg):
 def main(cfg: DictConfig):
     os.environ['CUDA_VISIBLE_DEVICES'] = ",".join(map(str, cfg.inference.inference.cuda_visible_devices))
     random.seed(cfg.inference.inference.seed)
-    InferenceRunner(cfg).run()
-    copy_hydra_config(cfg)
+    runner = InferenceRunner(cfg)
+    runner.run()
+    copy_hydra_config(runner.output_dir)
 
 if __name__ == "__main__":
     main()

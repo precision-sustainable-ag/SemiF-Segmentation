@@ -7,25 +7,17 @@ import shutil
 from hydra.core.hydra_config import HydraConfig
 
 # Import the task functions
-from src.preprocessing.grid_crop import main as grid_crop
-from src.preprocessing.train_val_test_split import main as train_val_test_split
-from src.preprocessing.remap_masks import main as remap_masks
+from src.preprocessing.build_dataset import main as build_dataset
+from src.preprocessing.tile import main as tile
 from src.preprocessing.data_stats import main as data_stats
-from src.preprocessing.move_fullsized_data import main as move_fullsized_data
-from src.preprocessing.find_images import main as find_images
-from src.preprocessing.remove_nontargets import main as remove_nontargets
 
 log = logging.getLogger(__name__)
 
 # Define a registry of tasks
 TASK_REGISTRY = {
-    "find_images": find_images,
-    "grid_crop": grid_crop,
-    "train_val_test_split": train_val_test_split,
-    "remap_masks": remap_masks,
+    "build_dataset": build_dataset,
+    "tile": tile,
     "data_stats": data_stats,
-    "move_fullsized_data": move_fullsized_data,
-    "remove_nontargets": remove_nontargets
     # Add more tasks here as needed
 }
 
@@ -52,8 +44,6 @@ def main(cfg: DictConfig) -> None:
     for task, enabled in task_dict.items():
 
         if enabled:
-            log.info(f"Running task {task}")
-
             if task in TASK_REGISTRY:
                 log.info(f"Running task {task}")
                 TASK_REGISTRY[task](cfg)

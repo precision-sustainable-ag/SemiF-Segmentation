@@ -1,0 +1,63 @@
+# One labeling round. Don't edit this file per round: create conf/label/<round>.yaml
+# starting with `defaults: [default, _self_]` (see example.yaml) and run
+#     python main.py mode=label label=<round>
+# Each task only acts on images whose status says they're ready for it, so
+# re-running the whole task list is safe; pull_cvat only picks up jobs that
+# are finished in CVAT (see cvat.pull_when).
+round: ???                # unique round name, e.g. r001_field_covercrops; also its run folder,
+                          # outputs/runs/<project.name>/<round>/ (project.subname)
+source: field             # a key in conf/sources: field | semif
+
+tasks:
+  select: true            # pick images from the source DB
+  fetch: true             # move them into the run folder (transfer.backend: globus | copy)
+  prepare: true           # downscale for CVAT + model pre-labels
+  push_cvat: true         # create the CVAT task (jobs of cvat.segment_size images)
+  pull_cvat: true         # read finished jobs back as masks
+
+retry_errors: false       # also re-run images a task previously marked as error
+
+select:
+  n_images: 200           # the round is topped up to this many images
+  seed: 42
+  balance_by: [batch]     # spread picks evenly across these columns: batch, location, or a source's meta columns
+  filters: {}             # source DB columns -> value | [values] | "pattern%"; e.g. {plant_type: COVERCROPS}
+
+fetch:
+  dry_run: false          # log the planned transfers without running them
+
+prepare:
+  max_side: 6144          # longest side of each frame uploaded to CVAT
+  split: false            # false: downscale the whole image to max_side; true: cut it at full
+                          # resolution, without overlap, into tiles of at most max_side
+                          # (2x2 for 9560x6368, 3x2 for 13368x9520); an image's tiles share one job
+  jpeg_quality: 95
+
+prelabel:
+  enable: true
+  # model: run the checkpoint below. masks: use existing masks laid out like
+  # AgIR-CVToolkit's, <masks_root>/<batch>/segmentations/<image_id>.png, where
+  # <batch> is the folder above images/ in the source DB path; any nonzero
+  # pixel is vegetation. Images with no mask fall back to missing_mask.
+  source: model           # model | masks
+  masks_root:       # e.g. /mnt/globus/MK_test/agir_v2_sample300/semifield-developed-images
+  missing_mask: model     # model | empty (start empty in CVAT)
+  # Binary UNet (mit_b4) from Field-AnnotationPipeline; swap in a model trained
+  # here once one exists (and set normalize: true with its data_stats mean/std).
+  checkpoint: /home/mkutuga/Field-AnnotationPipeline/data/models/train_unet_mitb4_v4/checkpoints/epoch=51-step=3484-val_loss=0.00.ckpt
+  arch: Unet
+  encoder: mit_b4
+  normalize: false        # this checkpoint was trained on plain [0, 1] input
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  input_scale: 1.0        # run the model at this fraction of native resolution
+  tile_size: 1024
+  overlap: 256
+  batch_size: 4
+  threshold: 0.5
+  min_area_px: 64         # drop blobs smaller than this (at CVAT resolution)
+  device: cuda
+  cuda_visible_devices: []  # e.g. [9]; empty leaves CUDA_VISIBLE_DEVICES alone
+
+pull_cvat:
+  refresh: false          # also re-pull labeled/excluded images (after reopening a job)

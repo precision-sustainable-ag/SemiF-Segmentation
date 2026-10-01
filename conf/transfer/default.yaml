@@ -1,0 +1,30 @@
+# How label fetch moves a round's full-resolution images into its run folder.
+backend: globus           # globus | copy (plain copy from mounted roots; for testing or before Globus is set up)
+
+globus:
+  # Transfers are submitted with the globus CLI, as AgIR-CVToolkit's
+  # scinet-transfer does: install it (uv tool install globus-cli), run
+  # `globus login` once, and fetch reuses that session.
+  cli: globus             # the command, or its full path (e.g. ~/.local/bin/globus)
+  # Collection IDs of the endpoints conf/sources roots name. If a collection
+  # needs a data_access consent, the first transfer fails with the
+  # `globus session consent ...` command to run.
+  endpoints:
+    ncsu_screberg: null
+    ncsu_raatwell: null
+    juno: null
+  # Files land in <dst_root>/<project.name>/<project.subname>/<path below the
+  # source root>: the round's run folder when dst_root is paths.out_root as
+  # this collection sees it.
+  destination:
+    name: sunny
+    endpoint: 24630c20-fbcb-11ef-9793-0e26ca329435   # Globus Connect Personal on sunny; shares ~/ only and must be running
+    dst_root: ${paths.out_root}
+  transfer:
+    sync_level: checksum        # exists | size | mtime | checksum
+    verify_checksum: true
+    skip_source_errors: true    # a missing file doesn't fail the transfer; fetch marks that image as an error
+    notify: failed,inactive     # Globus emails only when a transfer needs attention
+    label_prefix: semif-segmentation fetch
+    poll_interval_s: 60
+    timeout_s: 172800           # stop waiting after 48 h; the transfer continues, re-run fetch later
