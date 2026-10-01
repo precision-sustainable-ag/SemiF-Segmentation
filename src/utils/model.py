@@ -9,6 +9,9 @@ import segmentation_models_pytorch.losses as smp_losses
 import torch
 import torch.nn.functional as F
 from matplotlib.ticker import MaxNLocator
+from omegaconf import OmegaConf
+
+from src.utils.seg_metrics import DetailMetricsConfig, detail_metrics
 
 log = logging.getLogger(__name__)
 
@@ -177,135 +180,22 @@ class DiceFocalLoss(torch.nn.Module):
         return self.dice_weight * dice + self.focal_weight * focal
 
     
-class SegmentationModule(pl.LightningModule):
-    def __init__(self, cfg, **kwargs):
-        """
-        Unified segmentation module supporting multiple model architectures.
-        
-        Args:
-            arch (str): Type of model, e.g., 'Unet', 'UnetPlusPlus', 'DeepLabV3Plus', etc.
-            encoder_name (str): Name of the encoder, e.g., 'resnet34', 'efficientnet-b3'.
-            in_channels (int): Number of input channels.
-            out_classes (int): Number of output classes.
-            mode (str): Loss and metric computation mode, 'binary' or 'multiclass'.
-            **kwargs: Additional arguments for model configuration.
-        """
-        super().__init__()
-        self.save_hyperparameters()
-        self.cfg = cfg
-        self.arch_name=cfg.model.arch_name
-        self.encoder_name=cfg.model.encoder_name
-        self.encoder_weights=cfg.model.encoder_weights
-        self.in_channels=cfg.model.in_channels
-        self.out_classes=cfg.model.out_classes
-        self.mode=cfg.model.mode
-        self.ignore_index=cfg.model.ignore_index
-        
-        self.base_lr = cfg.train.lr.base_lr
-        self.encoder_lr = self.base_lr * 0.1
+def detail_metrics_config(cfg) -> DetailMetricsConfig:
+    """Settings for the boundary / thin-structure metrics (on foreground vs
+    background, also for multiclass), from train.detail_metrics."""
+    settings = cfg.train.get("detail_metrics")
+    return DetailMetricsConfig(**(OmegaConf.to_container(settings) if settings else {}))
 
-        # Threshold for binary classification
-        self.threshold = 0.5
 
-        # Dynamically initialize the model
-        self.model = smp.create_model(
-            self.arch_name,
-            encoder_name=self.encoder_name,
-            encoder_weights=self.encoder_weights,
-            in_channels=self.in_channels,
-            classes=self.out_classes,
-            **kwargs,
-        )
-
-        # Configure loss function
-        self.loss_strategy = cfg.train.loss.name
-        self.loss_fn = self.configure_loss()
-
-        # Metrics aggregation
-        self.training_step_outputs = []
-        self.validation_step_outputs = []
-        self.test_step_outputs = []
-
-    def configure_loss(self):
-        """
-        Configures the loss function based on the mode (binary or multiclass).
-        """
-        if self.mode == "binary":
-
-            if self.loss_strategy == "DiceFocalLoss":
-                return DiceFocalLoss(mode="binary", dice_weight=0.5, focal_weight=0.5)
-            
-            if self.loss_strategy == "DiceBCELoss":
-                return DiceBCELoss()
-            
-            if self.loss_strategy == "DiceWithBoundaryLoss":
-                return DiceWithBoundaryLoss(boundary_weight=0.2)
-            
-            if self.loss_strategy == "smpDiceLoss":
-                return smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True, ignore_index=self.ignore_index)
-            
-        elif self.mode == "multiclass":
-            if self.loss_strategy == "DiceCrossEntropy":
-                dice = smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
-                ce = torch.nn.CrossEntropyLoss(ignore_index=self.ignore_index)
-                return lambda logits, targets: 0.5 * dice(logits, targets) + 0.5 * ce(logits, targets)
-            else:
-                self.cfg.train.loss.name = "smpDiceLoss"
-                return smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
-            
-        else:
-            raise ValueError("Invalid mode. Choose 'binary' or 'multiclass'.")
-        
-
-    def configure_optimizers(self):
-        
-        head_lr = self.base_lr         # For segmentation head (often like decoder)
-        # Safely check if model has a segmentation head
-        if hasattr(self.model, 'segmentation_head'):
-            segmentation_head_params = list(self.model.segmentation_head.parameters())
-        else:
-            segmentation_head_params = []
-
-        optimizer = torch.optim.Adam([
-            {"params": self.model.encoder.parameters(), "lr": self.encoder_lr}, # used to be 1e-3
-            {"params": self.model.decoder.parameters(), "lr": self.base_lr}, # used to be 1e-3
-            {"params": segmentation_head_params, "lr": head_lr},
-        ])
-        
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer,
-            max_lr=[self.encoder_lr * 10, self.base_lr * 10, head_lr * 10],  # 10x schedule for each group
-            epochs=self.trainer.max_epochs,
-            steps_per_epoch=self.trainer.estimated_stepping_batches,
-        )
-        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step", "frequency": 1}}
-
-    def forward(self, image):
-        return self.model(image)
-
-    def shared_step(self, batch, stage):
-        images, masks, _ = batch
-        masks = masks.long()
-        
-        if self.mode == "multiclass" and masks.ndim == 4 and masks.shape[1] == 1:
-            masks = masks.squeeze(1)  # (B, H, W)
-        
-        # Forward pass
-        logits = self.forward(images)
-        # Compute the loss
-        loss = self.loss_fn(logits, masks)
-
-        if self.mode == "binary":
-            prob_masks = torch.sigmoid(logits)
-            pred_masks = (prob_masks > self.threshold).long()
-        elif self.mode == "multiclass":
-            prob_masks = torch.softmax(logits, dim=1)
-            pred_masks = prob_masks.argmax(keepdim=True, dim=1)
-
-        tp, fp, fn, tn = smp.metrics.get_stats(pred_masks, masks, mode=self.mode, num_classes=self.out_classes)
-        return {"loss": loss, "tp": tp, "fp": fp, "fn": fn, "tn": tn}
+class SemanticMetricsMixin:
+    """Epoch-level semantic metrics, plots and saving shared by the Lightning
+    modules. The module's steps append dicts with "tp", "fp", "fn", "tn"
+    (smp.metrics.get_stats) and, optionally, "detail" ({name: (B,) tensor},
+    src.utils.seg_metrics) to self.<stage>_step_outputs."""
 
     def shared_epoch_end(self, outputs, stage):
+        if not outputs:  # e.g. training steps of models that only return losses
+            return
         tp = torch.cat([x["tp"] for x in outputs])
         fp = torch.cat([x["fp"] for x in outputs])
         fn = torch.cat([x["fn"] for x in outputs])
@@ -330,11 +220,10 @@ class SegmentationModule(pl.LightningModule):
         self.log(f"{stage}_per_image_iou", per_image_iou, on_epoch=True, prog_bar=False)
         self.log(f"{stage}_dataset_iou", dataset_iou, on_epoch=True, prog_bar=True)
 
-    def training_step(self, batch, batch_idx):
-        result = self.shared_step(batch, "train")
-        self.log("train_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True)
-        self.training_step_outputs.append(result)
-        return result
+        if all("detail" in x for x in outputs):
+            for name in outputs[0]["detail"]:
+                values = torch.cat([x["detail"][name] for x in outputs])
+                self.log(f"{stage}_{name}", values.nanmean(), on_epoch=True, prog_bar=False)
 
     def on_train_epoch_end(self):
         self.shared_epoch_end(self.training_step_outputs, "train")
@@ -342,20 +231,9 @@ class SegmentationModule(pl.LightningModule):
         # Clear the training step outputs
         self.training_step_outputs.clear()
 
-    def validation_step(self, batch, batch_idx):
-        result = self.shared_step(batch, "valid")
-        self.log("valid_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True)
-        self.validation_step_outputs.append(result)
-        return result
-
     def on_validation_epoch_end(self):
         self.shared_epoch_end(self.validation_step_outputs, "valid")
         self.validation_step_outputs.clear()
-
-    def test_step(self, batch, batch_idx):
-        result = self.shared_step(batch, "test")
-        self.test_step_outputs.append(result)
-        return result
 
     def on_test_epoch_end(self):
         self.shared_epoch_end(self.test_step_outputs, "test")
@@ -451,3 +329,166 @@ class SegmentationModule(pl.LightningModule):
         plt.savefig(output_file)
         print(f"Plot saved to {output_file}")
         plt.close()
+
+
+class SegmentationModule(SemanticMetricsMixin, pl.LightningModule):
+    def __init__(self, cfg, **kwargs):
+        """
+        Unified segmentation module supporting multiple model architectures.
+        
+        Args:
+            arch (str): Type of model, e.g., 'Unet', 'UnetPlusPlus', 'DeepLabV3Plus', etc.
+            encoder_name (str): Name of the encoder, e.g., 'resnet34', 'efficientnet-b3'.
+            in_channels (int): Number of input channels.
+            out_classes (int): Number of output classes.
+            mode (str): Loss and metric computation mode, 'binary' or 'multiclass'.
+            **kwargs: Additional arguments for model configuration.
+        """
+        super().__init__()
+        # Only what the model reads: the full config has label-mode paths that
+        # need label.round, which the logger can't resolve outside mode=label.
+        self.save_hyperparameters({
+            "model": OmegaConf.to_container(cfg.model, resolve=True),
+            "train": OmegaConf.to_container(cfg.train, resolve=True),
+        })
+        self.cfg = cfg
+        self.arch_name=cfg.model.arch_name
+        self.encoder_name=cfg.model.encoder_name
+        self.encoder_weights=cfg.model.encoder_weights
+        self.in_channels=cfg.model.in_channels
+        self.out_classes=cfg.model.out_classes
+        self.mode=cfg.model.mode
+        self.ignore_index=cfg.model.ignore_index
+        
+        self.base_lr = cfg.train.lr.base_lr
+        self.encoder_lr = self.base_lr * 0.1
+
+        # Threshold for binary classification
+        self.threshold = 0.5
+        self.detail_cfg = detail_metrics_config(cfg)
+
+        # Dynamically initialize the model
+        self.model = smp.create_model(
+            self.arch_name,
+            encoder_name=self.encoder_name,
+            encoder_weights=self.encoder_weights,
+            in_channels=self.in_channels,
+            classes=self.out_classes,
+            **kwargs,
+        )
+
+        # Configure loss function
+        self.loss_strategy = cfg.train.loss.name
+        self.loss_fn = self.configure_loss()
+
+        # Metrics aggregation
+        self.training_step_outputs = []
+        self.validation_step_outputs = []
+        self.test_step_outputs = []
+
+    def configure_loss(self):
+        """
+        Configures the loss function based on the mode (binary or multiclass).
+        """
+        if self.mode == "binary":
+
+            if self.loss_strategy == "DiceFocalLoss":
+                return DiceFocalLoss(mode="binary", dice_weight=0.5, focal_weight=0.5)
+            
+            if self.loss_strategy == "DiceBCELoss":
+                return DiceBCELoss()
+            
+            if self.loss_strategy == "DiceWithBoundaryLoss":
+                return DiceWithBoundaryLoss(boundary_weight=0.2)
+            
+            if self.loss_strategy == "smpDiceLoss":
+                return smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True, ignore_index=self.ignore_index)
+            
+        elif self.mode == "multiclass":
+            if self.loss_strategy == "DiceCrossEntropy":
+                dice = smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
+                ce = torch.nn.CrossEntropyLoss(ignore_index=self.ignore_index)
+                return lambda logits, targets: 0.5 * dice(logits, targets) + 0.5 * ce(logits, targets)
+            else:
+                self.cfg.train.loss.name = "smpDiceLoss"
+                return smp.losses.DiceLoss(smp.losses.MULTICLASS_MODE, from_logits=True, ignore_index=self.ignore_index)
+            
+        else:
+            raise ValueError("Invalid mode. Choose 'binary' or 'multiclass'.")
+
+    def configure_optimizers(self):
+        
+        head_lr = self.base_lr         # For segmentation head (often like decoder)
+        # Safely check if model has a segmentation head
+        if hasattr(self.model, 'segmentation_head'):
+            segmentation_head_params = list(self.model.segmentation_head.parameters())
+        else:
+            segmentation_head_params = []
+
+        optimizer = torch.optim.Adam([
+            {"params": self.model.encoder.parameters(), "lr": self.encoder_lr}, # used to be 1e-3
+            {"params": self.model.decoder.parameters(), "lr": self.base_lr}, # used to be 1e-3
+            {"params": segmentation_head_params, "lr": head_lr},
+        ])
+        
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=[self.encoder_lr * 10, self.base_lr * 10, head_lr * 10],  # 10x schedule for each group
+            epochs=self.trainer.max_epochs,
+            steps_per_epoch=self.trainer.estimated_stepping_batches,
+        )
+        return {"optimizer": optimizer, "lr_scheduler": {"scheduler": scheduler, "interval": "step", "frequency": 1}}
+
+    def forward(self, image):
+        return self.model(image)
+
+    def shared_step(self, batch, stage):
+        images, masks, _ = batch
+        masks = masks.long()
+        
+        if self.mode == "multiclass" and masks.ndim == 4 and masks.shape[1] == 1:
+            masks = masks.squeeze(1)  # (B, H, W)
+        
+        # Forward pass
+        logits = self.forward(images)
+        # Compute the loss
+        loss = self.loss_fn(logits, masks)
+
+        if self.mode == "binary":
+            prob_masks = torch.sigmoid(logits)
+            pred_masks = (prob_masks > self.threshold).long()
+        elif self.mode == "multiclass":
+            prob_masks = torch.softmax(logits, dim=1)
+            pred_masks = prob_masks.argmax(keepdim=True, dim=1)
+
+        tp, fp, fn, tn = smp.metrics.get_stats(pred_masks, masks, mode=self.mode, num_classes=self.out_classes)
+        result = {"loss": loss, "tp": tp, "fp": fp, "fn": fn, "tn": tn}
+        if stage != "train":
+            result["detail"] = detail_metrics(pred_masks.view(masks.shape[0], *masks.shape[-2:]),
+                                              masks.view(masks.shape[0], *masks.shape[-2:]), self.detail_cfg)
+        return result
+
+    @torch.no_grad()
+    def predict_semantic(self, images: torch.Tensor) -> torch.Tensor:
+        """(B, H, W) class indices for a (B, C, H, W) batch."""
+        logits = self.forward(images)
+        if self.mode == "binary":
+            return (torch.sigmoid(logits[:, 0]) > self.threshold).long()
+        return logits.argmax(dim=1)
+
+    def training_step(self, batch, batch_idx):
+        result = self.shared_step(batch, "train")
+        self.log("train_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True)
+        self.training_step_outputs.append(result)
+        return result
+
+    def validation_step(self, batch, batch_idx):
+        result = self.shared_step(batch, "valid")
+        self.log("valid_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True)
+        self.validation_step_outputs.append(result)
+        return result
+
+    def test_step(self, batch, batch_idx):
+        result = self.shared_step(batch, "test")
+        self.test_step_outputs.append(result)
+        return result

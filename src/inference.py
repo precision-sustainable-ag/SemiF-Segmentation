@@ -5,6 +5,7 @@ import random
 import hydra
 from omegaconf import DictConfig
 
+from src.inferencing.full_image_eval import main as full_image_eval
 from src.inferencing.inference import main as inference
 
 log = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ log = logging.getLogger(__name__)
 # Define a registry of tasks
 TASK_REGISTRY = {
     "inference": inference,
+    "full_image_eval": full_image_eval,
     # Add more tasks here as needed
 }
 

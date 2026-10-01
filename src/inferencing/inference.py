@@ -15,8 +15,10 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
+from src.inferencing.tiled_instances import paint_semantic, predict_tiled_instances
+from src.utils.instance_model import InstanceSegmentationModule
 from src.utils.model import SegmentationModule
 
 log = logging.getLogger(__name__)
@@ -96,9 +98,10 @@ class ImageProcessor:
 
 
 class Predictor:
-    def __init__(self, model, threshold=0.5):
+    def __init__(self, model, threshold=0.5, instance_tiling=None):
         self.model = model
         self.threshold = threshold
+        self.instance_tiling = instance_tiling  # tile_size, overlap, merge_iou, batch_size (instance models)
 
     def predict(self, image_tensor: torch.Tensor, out_classes: int):
         """
@@ -108,6 +111,17 @@ class Predictor:
         self.model.eval()
         with torch.no_grad():
             start = time.time()
+            if isinstance(self.model, InstanceSegmentationModule):
+                # instance models: overlapping tiles stitched into full-image
+                # instances, painted into a class-index mask
+                masks = [
+                    paint_semantic(predict_tiled_instances(self.model.model, image, mask_threshold=self.model.mask_threshold,
+                                                           **self.instance_tiling),
+                                   self.model.score_threshold)
+                    for image in image_tensor
+                ]
+                inference_time = time.time() - start
+                return (masks[0] if len(masks) == 1 else masks), inference_time
             outputs = self.model(image_tensor)
             inference_time = time.time() - start
 
@@ -382,13 +396,16 @@ class InferenceRunner:
         return self.cfg.inference.inference.mean, self.cfg.inference.inference.std
 
     def run(self):
-        model = SegmentationModule.load_from_checkpoint(
+        instance = self.cfg.model.get("task", "semantic") == "instance"
+        module_cls = InstanceSegmentationModule if instance else SegmentationModule
+        model = module_cls.load_from_checkpoint(
             checkpoint_path=self.model_ckpt,
             cfg=self.cfg,
         ).to(self.device)
 
         processor = ImageProcessor(self.mean, self.std, self.cfg)
-        predictor = Predictor(model, self.cfg.inference.inference.threshold)
+        predictor = Predictor(model, self.cfg.inference.inference.threshold,
+                              OmegaConf.to_container(self.cfg.inference.instance_tiling, resolve=True))
         visualizer = Visualizer(self.cfg, self.output_dir,self.cfg.inference.inference.plot, self.cfg.inference.inference.plot.dpi, self.cfg.inference.inference.plot.transparent)
 
         paths = sorted(self.image_dir.glob("*.jpg"))

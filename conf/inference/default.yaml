@@ -1,5 +1,6 @@
 tasks:
   inference: true
+  full_image_eval: false   # instance models: score whole images of a split (src/inferencing/full_image_eval.py)
 
 inference:
   explicit_img_dir:
@@ -31,3 +32,20 @@ inference:
     - 0.18942575591144425
     - 0.19259909206363238
     - 0.17072289022513365
+
+# Instance models on images larger than a tile: overlapping tiles, stitched
+# into full-image instances (src/inferencing/tiled_instances.py)
+instance_tiling:
+  tile_size: ${preprocess.tile.tile_size}
+  overlap: 512           # px at training scale; plants smaller than this are never cut
+  merge_iou: 0.5         # detections of two tiles are one instance if their masks' IoU in the shared region >= this
+  merge_min_score: ${model.predict.score_threshold}  # only detections this confident merge (low-score chains glue everything)
+  batch_size: 4          # tiles per forward pass
+
+full_image_eval:
+  split: test            # manifest split whose full images are scored
+  checkpoint: best.ckpt  # in paths.inference.checkpoints (train/version_<inference.inference.version>)
+  max_images: null       # null = all images of the split
+  max_dets: 1000         # detections per image counted in AP (COCO's default of 100 is too few for whole images)
+  plot: true
+  zoom_size: 2048        # full-resolution window shown in <image>_zoom.png

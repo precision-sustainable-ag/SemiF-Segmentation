@@ -275,3 +275,75 @@ def side_by_side_plot(img_path, mask_gt, mask_pred, output_path: Path, class_col
 
     plt.savefig(output_path, bbox_inches='tight', dpi=300)
     plt.close()
+
+
+def draw_instances(image: np.ndarray, masks: np.ndarray, boxes: np.ndarray, texts=None, alpha: float = 0.45) -> np.ndarray:
+    """RGB image with each instance filled in its own color, outlined, and boxed.
+
+    Args:
+        image: (H, W, 3) uint8 RGB.
+        masks: (N, H, W) bool.
+        boxes: (N, 4) xyxy.
+        texts: optional N labels drawn at the box corners (e.g. scores).
+    """
+    out = image.astype(np.float32)
+    thickness = max(2, round(max(image.shape[:2]) / 700))
+    colors = (plt.cm.tab20(np.arange(len(masks)) % 20)[:, :3] * 255).astype(np.uint8)
+    for mask, color in zip(masks, colors):
+        out[mask] = (1 - alpha) * out[mask] + alpha * color
+    out = out.astype(np.uint8)
+    for k, (mask, box, color) in enumerate(zip(masks, boxes, colors)):
+        c = tuple(int(v) for v in color)
+        contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        cv2.drawContours(out, contours, -1, c, thickness)
+        x0, y0, x1, y1 = (int(round(v)) for v in box)
+        cv2.rectangle(out, (x0, y0), (x1, y1), c, thickness)
+        if texts is not None:
+            scale = thickness / 2
+            (tw, th), _ = cv2.getTextSize(texts[k], cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+            y = max(y0, th + 4)
+            cv2.rectangle(out, (x0, y - th - 4), (x0 + tw + 4, y), c, -1)
+            cv2.putText(out, texts[k], (x0 + 2, y - 2), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255), thickness)
+    return out
+
+
+def instance_plot(img_path, gt_target: dict, prediction: dict, output_path: Path,
+                  score_threshold: float = 0.5, mask_threshold: float = 0.5, class_labels: dict | None = None,
+                  image_scale: float = 1.0):
+    """Image | ground-truth instances | predicted instances (score >= score_threshold, with scores).
+
+    gt_target: {"boxes", "masks" (N, H, W)}, or None to leave out that panel
+    (unlabeled images); prediction: a torchvision detector
+    output {"boxes", "labels", "scores", "masks" (N, 1, H, W)}. Tensors or arrays.
+    image_scale: the scale the image was resized by before prediction; the image
+    is then padded/cropped at the bottom right to the predicted masks' size.
+    """
+    to_np = lambda x: x.detach().cpu().numpy() if isinstance(x, torch.Tensor) else np.asarray(x)  # noqa: E731
+    image = cv2.cvtColor(cv2.imread(str(img_path)), cv2.COLOR_BGR2RGB)
+
+    keep = to_np(prediction["scores"]) >= score_threshold
+    scores, labels = to_np(prediction["scores"])[keep], to_np(prediction["labels"])[keep]
+    pred_masks = to_np(prediction["masks"])[keep][:, 0] > mask_threshold
+    if image_scale != 1:
+        image = cv2.resize(image, None, fx=image_scale, fy=image_scale, interpolation=cv2.INTER_AREA)
+    h, w = prediction["masks"].shape[-2:]
+    image = cv2.copyMakeBorder(image[:h, :w], 0, max(h - image.shape[0], 0), 0, max(w - image.shape[1], 0),
+                               cv2.BORDER_CONSTANT, value=0)
+    pred_boxes = to_np(prediction["boxes"])[keep]
+    multiclass = class_labels is not None and len(class_labels) > 2
+    texts = [f"{class_labels.get(int(l), l)} {s:.2f}" if multiclass else f"{s:.2f}" for l, s in zip(labels, scores)]
+
+    panels = [(image, f"{Path(img_path).stem}")]
+    if gt_target is not None:
+        gt_masks, gt_boxes = to_np(gt_target["masks"]).astype(bool), to_np(gt_target["boxes"])
+        panels.append((draw_instances(image, gt_masks, gt_boxes), f"Ground truth: {len(gt_boxes)} instances"))
+    panels.append((draw_instances(image, pred_masks, pred_boxes, texts),
+                   f"Prediction: {len(pred_boxes)} instances (score >= {score_threshold})"))
+    fig, axs = plt.subplots(1, len(panels), figsize=(6 * len(panels), 6.4))
+    for ax, (panel, title) in zip(axs, panels):
+        ax.imshow(panel)
+        ax.set_title(title, fontsize=10)
+        ax.axis("off")
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches="tight", dpi=200)
+    plt.close()
