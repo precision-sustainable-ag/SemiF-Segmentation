@@ -30,6 +30,11 @@ trainer:
   num_sanity_val_steps: 0
   deterministic: true  # true for binary, false for multiclass
   
+detail_metrics:           # valid/test boundary and thin-structure metrics (src/utils/seg_metrics.py), in px at train scale
+  boundary_width: 3       # boundary IoU band width
+  boundary_tolerance: 2   # boundary F1 match distance
+  thin_width: 7           # thin_recall: foreground narrower than this counts as thin
+
 callbacks:
   monitor: valid_dataset_iou
   mode: max

@@ -96,3 +96,67 @@ class Dataset(BaseDataset):
         if mask.ndim == 2:  # Add channel dimension if single-channel
             mask = np.expand_dims(mask, axis=0)
         return torch.from_numpy(mask).long()
+
+
+def masks_to_instances(mask: np.ndarray, min_area: int = 0, max_instances: int | None = None) -> dict:
+    """Instance targets (torchvision detection format) from a semantic mask:
+    one instance per 8-connected blob of each class value > 0, largest first.
+
+    Args:
+        mask: (H, W) class indices, 0 = background.
+        min_area: blobs with fewer pixels are dropped.
+        max_instances: keep at most this many (the largest), None = all.
+    Returns:
+        {"boxes": (N, 4) float xyxy, "labels": (N,) int64 class values,
+         "masks": (N, H, W) uint8}
+    """
+    height, width = mask.shape
+    found = []  # (area, class value, component index, x, y, w, h, labels image)
+    for value in np.unique(mask):
+        if value == 0:
+            continue
+        n, labels, stats, _ = cv2.connectedComponentsWithStats((mask == value).astype(np.uint8), connectivity=8)
+        for i in range(1, n):
+            x, y, w, h, area = stats[i]
+            if area >= min_area:
+                found.append((int(area), int(value), i, x, y, w, h, labels))
+    found.sort(key=lambda f: -f[0])
+    if max_instances is not None:
+        found = found[:max_instances]
+
+    masks = np.zeros((len(found), height, width), dtype=np.uint8)
+    boxes = np.zeros((len(found), 4), dtype=np.float32)
+    for k, (_, _, i, x, y, w, h, labels) in enumerate(found):
+        masks[k] = labels == i
+        boxes[k] = (x, y, x + w, y + h)  # pixel edges: the box covers columns x .. x + w - 1
+    return {
+        "boxes": torch.from_numpy(boxes),
+        "labels": torch.tensor([f[1] for f in found], dtype=torch.int64),
+        "masks": torch.from_numpy(masks),
+    }
+
+
+class InstanceDataset(Dataset):
+    """Dataset for the instance-segmentation models: the same images,
+    augmentation and normalization as Dataset, with the semantic mask turned
+    into instances (masks_to_instances). Returns (image, target, stem), where
+    target also holds the semantic mask as "semantic_mask" (H, W) for the
+    semantic metrics."""
+
+    def __init__(self, *args, min_area: int = 0, max_instances: int | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.min_area = min_area
+        self.max_instances = max_instances
+
+    def __getitem__(self, idx):
+        image, mask, stem = super().__getitem__(idx)
+        semantic = mask[0]
+        target = masks_to_instances(semantic.numpy().astype(np.uint8), self.min_area, self.max_instances)
+        target["semantic_mask"] = semantic
+        return image, target, stem
+
+
+def collate_instances(batch):
+    """Batch InstanceDataset items as lists (images may differ in size, targets in length)."""
+    images, targets, stems = zip(*batch)
+    return list(images), list(targets), list(stems)

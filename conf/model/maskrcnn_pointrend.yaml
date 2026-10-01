@@ -1,0 +1,18 @@
+# Mask R-CNN R50-FPN-V2 + PointRend (src/models/pointrend), torchvision-based.
+# Identical to conf/model/maskrcnn.yaml except for the mask branch, so the two
+# isolate the effect of PointRend. Select with model=maskrcnn_pointrend.
+defaults:
+  - maskrcnn
+  - _self_
+
+name: maskrcnn_pointrend          # key of src.models.MODEL_REGISTRY
+arch_name: MaskRCNNPointRend
+
+pointrend:
+  class_agnostic_mask: true       # one foreground mask shared by all classes; box head stays multi-class
+  num_points: 196                 # training points per box (14 x 14)
+  oversample_ratio: 3             # candidates drawn per training point
+  importance_sample_ratio: 0.75   # share of training points taken from the most uncertain candidates
+  subdivision_steps: 4            # inference: 7 x 7 coarse mask -> 7 * 2^steps (112) per box
+  subdivision_num_points: 784     # inference: points refined per step (28 x 28)
+  fine_feature_names: ["0"]       # FPN levels for point features ("0" = p2, stride 4)

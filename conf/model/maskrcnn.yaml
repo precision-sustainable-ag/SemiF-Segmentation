@@ -1,0 +1,33 @@
+# Plain torchvision Mask R-CNN R50-FPN-V2 (src/models/maskrcnn.py): the
+# instance-segmentation baseline for conf/model/maskrcnn_pointrend.yaml.
+# Select with model=maskrcnn. Trained by src.utils.instance_model on
+# instances derived from the semantic tile masks (one per connected blob).
+task: instance                    # instance models use InstanceSegmentationModule / InstanceDataset
+name: maskrcnn                    # key of src.models.MODEL_REGISTRY
+arch_name: MaskRCNN               # for run_info.json
+backbone: resnet50_fpn_v2
+pretrained: coco                  # coco (full detector) | imagenet (ResNet only) | null
+trainable_backbone_layers: 3      # ResNet stages trained, from the last (5 = all)
+in_channels: 3
+num_classes: 2                    # detection classes incl. background (torchvision convention): 2 for binary vegetation
+out_classes: ${train.out_classes} # semantic classes of the masks, for the metrics
+mode: ${train.class_mode}
+ignore_index: null
+
+instances:                        # instance targets from the semantic masks (src.utils.datasets.masks_to_instances)
+  min_area: 64                    # px; smaller blobs aren't instances (they still count in the semantic metrics)
+  max_instances: 100              # largest blobs kept per tile
+
+detector:                         # torchvision MaskRCNN kwargs
+  box_detections_per_img: 100
+  box_score_thresh: 0.05
+
+predict:                          # detections -> semantic mask (metrics, sample predictions, inference)
+  score_threshold: 0.5
+  mask_threshold: 0.5
+
+optim:
+  lr: 0.01                        # SGD; torchvision's recipe uses 0.02 at batch size 16
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  warmup_steps: 200
