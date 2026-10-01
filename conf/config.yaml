@@ -9,6 +9,7 @@ defaults:
   - transfer: default       # How label fetch moves images (Globus endpoints and paths)
   - cvat: default           # CVAT server, organization, and project
   - label: default          # Labeling round (select one with label=<round>)
+  - proposals: sam3         # pseudo-instance teacher (optional; preprocess tasks pseudo_instances, full_image_boxes)
 
   - _self_                   # Ensures overriding behavior
 

@@ -14,7 +14,10 @@ out_classes: ${train.out_classes} # semantic classes of the masks, for the metri
 mode: ${train.class_mode}
 ignore_index: null
 
-instances:                        # instance targets from the semantic masks (src.utils.datasets.masks_to_instances)
+instances:                        # instance targets (src.utils.datasets.InstanceDataset)
+  source: connected_components    # connected_components: one per blob of the semantic mask (masks_to_instances)
+                                  # pseudo: files in split_dir/<split>/<pseudo_dirname> (SAM 3: preprocess task pseudo_instances)
+  pseudo_dirname: ${proposals.pseudo_labels.dirname}
   min_area: 64                    # px; smaller blobs aren't instances (they still count in the semantic metrics)
   max_instances: 100              # largest blobs kept per tile
 
