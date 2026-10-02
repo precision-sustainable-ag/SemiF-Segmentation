@@ -36,12 +36,27 @@ def is_instance_model(cfg: DictConfig) -> bool:
     """Instance-segmentation models (src/models, conf/model/maskrcnn*.yaml) vs the smp semantic ones."""
     return cfg.model.get("task", "semantic") == "instance"
 
+def instances_dir(cfg: DictConfig, image_dir) -> Path | None:
+    """Where a split's instance files are (model.instances.source=pseudo: split_dir/<split>/<pseudo_dirname>, e.g. instances_sam3,
+    written by the preprocess task pseudo_instances), or None to use the semantic mask's connected blobs."""
+    icfg = cfg.model.instances
+    source = icfg.get("source", "connected_components")
+    if source == "connected_components":
+        return None
+    if source != "pseudo":
+        raise ValueError(f"model.instances.source must be connected_components or pseudo, got {source!r}")
+    path = Path(image_dir).parent / icfg.pseudo_dirname
+    if not path.is_dir():
+        raise FileNotFoundError(f"{path} not found; generate it with mode=preprocess preprocess.tasks.pseudo_instances=true")
+    return path
+
 def make_dataset(cfg: DictConfig, image_dir, mask_dir, augmentation, mean, std):
     """The dataset the configured model trains on: semantic masks, or instances derived from them."""
     kwargs = dict(augmentation=augmentation, normalize_image=cfg.train.dataset.normalize, mean=mean, std=std)
     if is_instance_model(cfg):
         return InstanceDataset(image_dir, mask_dir, min_area=cfg.model.instances.min_area,
-                               max_instances=cfg.model.instances.max_instances, **kwargs)
+                               max_instances=cfg.model.instances.max_instances,
+                               instances_dir=instances_dir(cfg, image_dir), **kwargs)
     return Dataset(image_dir, mask_dir, **kwargs)
 
 def load_stats(stats_file: Path):

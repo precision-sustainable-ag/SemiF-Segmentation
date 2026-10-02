@@ -7,6 +7,8 @@ tasks:
   build_dataset: true   # assign train/val/test per image (kept forever) and write the manifest
   tile: true            # cut images and masks into tiles at tile.scale
   data_stats: true      # RGB mean/std of the train tiles + class pixel balance
+  pseudo_instances: false  # SAM 3 pseudo-instances for the tiles (conf/proposals; needs `uv sync --extra sam3`)
+  full_image_boxes: false  # SAM 3 plant boxes of the full images, downscaled (conf/proposals full_image)
 
 build_dataset:
   val_size: 0.05

@@ -10,6 +10,8 @@ from hydra.core.hydra_config import HydraConfig
 from src.preprocessing.build_dataset import main as build_dataset
 from src.preprocessing.tile import main as tile
 from src.preprocessing.data_stats import main as data_stats
+from src.preprocessing.pseudo_instances import main as pseudo_instances
+from src.preprocessing.full_image_boxes import main as full_image_boxes
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +20,8 @@ TASK_REGISTRY = {
     "build_dataset": build_dataset,
     "tile": tile,
     "data_stats": data_stats,
+    "pseudo_instances": pseudo_instances,
+    "full_image_boxes": full_image_boxes,
     # Add more tasks here as needed
 }
 

@@ -1,0 +1,32 @@
+# SAM 3 (facebookresearch/sam3): text-prompted proposals (src/models/proposals/sam3.py).
+# Optional: `uv sync --extra sam3`; the checkpoint is gated (request access, `hf auth login`).
+defaults:
+  - common
+  - _self_
+
+name: sam3                # key of src.models.PROPOSAL_GENERATOR_REGISTRY
+checkpoint: sam3          # sam3 = facebook/sam3 from Hugging Face, a path to sam3.pt, or random (untrained; plumbing tests only)
+resolution: 1008          # SAM 3's input size; every image/tile is resized to resolution x resolution
+compile: false
+
+prompts:                  # each is run on every image; proposals of all prompts are pooled
+  - plant
+  - grass
+
+prompt_labels: {}         # prompt -> detection class, used only where no semantic mask gives the class (default_label)
+
+
+score_threshold: 0.5      # SAM 3 confidence (presence x query score)
+mask_threshold: 0.5      # SAM 3 mask confidence threshold
+
+full_image:               # preprocess task full_image_boxes (src/preprocessing/full_image_boxes.py)
+  scale: 0.325
+  plot_previews: 40 
+
+tiling:
+  tile_size: 1008
+
+filtering:
+  min_semantic_overlap: 0.5
+  max_background_fraction: 0.5
+  min_area: 100

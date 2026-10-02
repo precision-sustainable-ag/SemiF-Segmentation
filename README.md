@@ -144,6 +144,89 @@ python main.py mode=inference
   `run_2/`, ... folder each time, so re-running with another threshold never
   overwrites earlier predictions.
 
+## SAM 3 pseudo-instances (optional)
+
+The instance models (`model=maskrcnn`, `model=maskrcnn_pointrend`) train by
+default on one instance per connected blob of the semantic mask, which merges
+touching plants. [SAM 3](https://github.com/facebookresearch/sam3) can act as a
+teacher instead: it proposes plant instances from text prompts (`plant`,
+`weed`, `broadleaf plant`, ...), the semantic labels decide which proposals to
+trust, and the result is instance annotations to train on. SAM 3 is not
+needed to train or run the trained model.
+
+SAM 3 is under Meta's [SAM License](https://github.com/facebookresearch/sam3/blob/main/LICENSE)
+(royalty-free, commercial use allowed; publications must acknowledge SAM; its
+weights and derivatives may only be redistributed under that license). The
+checkpoint is gated: request access at https://huggingface.co/facebook/sam3,
+then once per machine create a read token (huggingface.co > Settings > Access
+Tokens) and run `uv run hf auth login`.
+
+```bash
+uv sync --extra sam3
+uv run hf auth login                  # paste the read token
+python main.py mode=preprocess preprocess.tasks.build_dataset=false preprocess.tasks.tile=false \
+  preprocess.tasks.data_stats=false preprocess.tasks.pseudo_instances=true \
+  proposals.pseudo_labels.max_tiles=20  # trial run; look at previews/ and summary.csv, then drop max_tiles
+python main.py mode=train model=maskrcnn_pointrend model.instances.source=pseudo
+```
+
+For each tile of
+`proposals.pseudo_labels.splits`, `pseudo_instances`
+([src/preprocessing/pseudo_instances.py](src/preprocessing/pseudo_instances.py)):
+
+1. runs SAM 3 with each of `proposals.prompts` and keeps proposals scoring at least `proposals.score_threshold`;
+2. drops proposals that disagree with the tile's semantic mask
+   (`proposals.filtering`: share on plant pixels, share on labeled background,
+   IoU with the plants in the proposal's box, ...) and small/large ones;
+3. removes duplicates by mask IoU (`mask_nms_threshold`) and settles
+   proposals inside other proposals (`containment_threshold`,
+   `containment_policy`: keep the higher-scored, the whole plant, or its parts);
+4. clips each instance to the semantic foreground, gives overlapping pixels to
+   the higher-scored instance, and takes the class from the semantic mask.
+
+It writes `paths.split_dir/<split>/instances_sam3/`: `<stem>.png` (uint16
+instance ids) + `<stem>.json` (class, score, `annotation_source`, the
+generator settings), `proposals/<stem>.json` (every proposal, its metrics and
+why it was rejected), `previews/`, and `summary.csv` (instances per tile, and
+the share of plant pixels no instance claimed). Re-running skips tiles that are
+done (`proposals.pseudo_labels.overwrite=true` redoes them). To correct an
+instance, edit the id map and set its `annotation_source` to
+`sam3_corrected` (`human` for instances drawn from scratch).
+
+### Boxes for full-size images
+
+`preprocess.tasks.full_image_boxes=true` does the same for whole images
+([src/preprocessing/full_image_boxes.py](src/preprocessing/full_image_boxes.py)):
+each full image of `proposals.full_image.splits` (from the manifest, with its
+label mask) is downscaled by `proposals.full_image.scale` (default: the
+training scale), predicted on overlapping tiles merged across tile edges,
+filtered and clipped to the semantic mask, and its boxes are written **in
+full-resolution pixels** to
+`preprocess/data/full_image_boxes/sam3_scale<scale>/`: `boxes.csv`
+(one row per box), `<image_id>.json` (also the boxes at the working scale),
+`previews/`. `proposals.full_image.image_dir` boxes a folder of images without
+masks instead.
+
+In Python:
+
+```python
+from src.models import build_model, build_proposal_generator
+from src.models.external_proposals import predict_with_proposals
+
+generator = build_proposal_generator(cfg.proposals.name, cfg.proposals)  # "sam3"
+result = generator.predict(image, semantic_mask=mask) # ProposalResult: .proposals, .rejected
+target = generator.create_pseudo_target(image, semantic_mask=mask)  # {"boxes", "labels", "masks", ...}
+instances = generator.predict_tiled(full_image)       # large images: tiles merged as in tiled_instances
+
+# SAM-assisted inference: the trained model classifies and refines the proposals' boxes
+model = build_model("maskrcnn_pointrend", num_classes=2).eval()
+detections = predict_with_proposals(model, [image_tensor], [result.boxes])
+```
+
+SAM 3 works on 1008 x 1008 inputs and returns at most 200 instances per
+prompt, so keep tiles near 1024 px (as `preprocess.tile.tile_size` does), and
+use `predict_tiled` for whole images.
+
 ## Where outputs go
 
 Everything a project produces sits in its AgIR-CVToolkit-style folder,
@@ -173,6 +256,7 @@ and by the model version that made them. Each mode's Hydra logs are in
 | `conf/cvat/` | CVAT URL/organization (defaults from `.keys/keys.yaml`), project, job size, when to pull |
 | `conf/preprocess/` | Split sizes and grouping, tile scale/size |
 | `conf/model/`, `conf/train/`, `conf/augment/`, `conf/inference/` | Model, training, augmentation, inference |
+| `conf/proposals/` | SAM 3 teacher: model, prompts, proposal filtering, pseudo-instance output (optional) |
 | `conf/paths/` | Where everything is written: `outputs/runs/<project.name>/` |
 
 ## Tests

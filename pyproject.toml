@@ -25,11 +25,22 @@ dependencies = [
   "torchmetrics>=1.9.0",
 ]
 
+[project.optional-dependencies]
+# SAM 3 proposals / pseudo-instances (src/models/proposals/sam3.py, conf/proposals/sam3.yaml): uv sync --extra sam3
+sam3 = [
+  "sam3 @ git+https://github.com/facebookresearch/sam3@2345a4ad109ac29c569da749c91d84f10dc08c40",
+  "setuptools<81",  # sam3 imports pkg_resources, removed in setuptools 81
+  "einops",         # imported by sam3 but not in its dependencies
+  "psutil",         # ditto
+]
+
 [dependency-groups]
 dev = ["pytest>=8.4.2"]
 
 [tool.uv]
 package = false   # run from the repo root (python main.py ...); src/ isn't installed
+# sam3 pins numpy<2 but runs on numpy 2 (checked with 2.5); keep the repo's numpy
+override-dependencies = ["numpy>=2.2.6"]
 
 [[tool.uv.index]]
 name = "pytorch-cu126"

@@ -1,0 +1,49 @@
+# Settings every proposal generator shares (src/models/proposals); sam3.yaml
+# extends this (select with proposals=sam3, the default).
+# Used by the preprocess task pseudo_instances (src/preprocessing/pseudo_instances.py),
+# which writes the instance files model.instances.source=pseudo trains on.
+
+device: cuda
+autocast_dtype: bfloat16  # CUDA autocast, as in the SAM examples (null = float32)
+mask_threshold: 0.5
+
+filtering:                # src/models/proposals/filtering.py (null = no limit)
+  min_area: 100           # px; also the smallest an instance may be after clipping to the semantic mask
+  max_area: null
+  # agreement with the semantic mask (pseudo-labelling only):
+  min_semantic_overlap: 0.5      # share of the proposal on plant pixels (foreground purity)
+  max_background_fraction: 0.1   # share on labeled background; differs from 1 - overlap only with ignore_value
+  min_foreground_iou: null       # IoU with the plant pixels inside the proposal's box
+  min_foreground_coverage: null  # share of the plant pixels inside the box the proposal covers
+  ignore_value: null             # semantic value that is neither plant nor background (e.g. 255 unlabeled)
+  # overlapping proposals, compared by mask pixels:
+  mask_nms_threshold: 0.7        # mask IoU at which the lower-scored proposal is a duplicate
+  containment_threshold: 0.9     # share of one mask inside another at which one "contains" the other
+  containment_policy: keep_higher_score  # keep_higher_score | keep_larger (whole plants) | keep_smaller (separate plants) | keep_both
+
+pseudo_labels:            # src/models/proposals/pseudo_labels.py, src/preprocessing/pseudo_instances.py
+  clip_to_semantic: true  # instances keep only their pixels on semantic foreground: boundaries follow the labels
+  exclusive_masks: true   # a pixel belongs to the highest-scored instance (required by the id-map files)
+  default_label: 1        # class where no semantic mask gives one
+  splits: [train, val, test]
+  dirname: instances_${proposals.name}  # written to paths.split_dir/<split>/<dirname>/
+  skip_empty_tiles: true  # tiles without plant pixels get an empty annotation without running the model
+  overwrite: false        # false: tiles that already have an annotation are skipped (resume)
+  max_tiles: null         # per split, for trial runs
+
+tiling:                   # ProposalGenerator.predict_tiled, for images larger than a tile
+  tile_size: 1024
+  overlap: 256
+  merge_iou: 0.5
+
+full_image:               # preprocess task full_image_boxes (src/preprocessing/full_image_boxes.py)
+  scale: ${preprocess.tile.scale}  # full images are downscaled by this (default: the training scale); boxes are written at full resolution
+  splits: [train, val, test]  # manifest splits whose full images (and label masks) are boxed
+  image_dir: null         # instead: every *.jpg here (under paths.persistent_dir), without semantic masks
+  max_images: null        # for trial runs
+  overwrite: false        # false: images that already have a JSON are skipped (resume)
+  plot_previews: 10       # downscaled image + boxes for the first N images
+
+output:
+  save_proposals: true    # <dirname>/proposals/<stem>.json: every proposal with its metrics and why it was rejected
+  save_previews: 20       # <dirname>/previews/: image | semantic mask | kept instances, for the first N tiles per split

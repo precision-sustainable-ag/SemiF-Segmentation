@@ -7,6 +7,8 @@ from typing import List, Union
 
 import logging
 
+from src.utils.instance_annotations import id_map_to_instances, load_instance_annotation
+
 log = logging.getLogger(__name__)
 
 
@@ -138,22 +140,49 @@ def masks_to_instances(mask: np.ndarray, min_area: int = 0, max_instances: int |
 
 class InstanceDataset(Dataset):
     """Dataset for the instance-segmentation models: the same images,
-    augmentation and normalization as Dataset, with the semantic mask turned
-    into instances (masks_to_instances). Returns (image, target, stem), where
-    target also holds the semantic mask as "semantic_mask" (H, W) for the
-    semantic metrics."""
+    augmentation and normalization as Dataset. Instances come from
+    - the semantic mask, one per connected blob (masks_to_instances), or
+    - instance files in instances_dir (src.utils.instance_annotations, e.g.
+      SAM 3 pseudo-instances from src/preprocessing/pseudo_instances.py);
+      tiles without one are left out.
+    Returns (image, target, stem), where target also holds the semantic mask
+    as "semantic_mask" (H, W) for the semantic metrics, and, from instance
+    files, "scores" and "annotation_source" (provenance) per instance."""
 
-    def __init__(self, *args, min_area: int = 0, max_instances: int | None = None, **kwargs):
+    def __init__(self, *args, min_area: int = 0, max_instances: int | None = None,
+                 instances_dir: Path | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.min_area = min_area
         self.max_instances = max_instances
+        self.instances_dir = Path(instances_dir) if instances_dir is not None else None
+        if self.instances_dir is not None:
+            pairs = [(img, msk) for img, msk in zip(self.images_fps, self.masks_fps)
+                     if (self.instances_dir / f"{Path(msk).stem}.png").exists()]
+            skipped = len(self.images_fps) - len(pairs)
+            if skipped:
+                log.warning("%d of %d tiles have no instance file in %s; leaving them out",
+                            skipped, len(self.images_fps), self.instances_dir)
+            self.images_fps = [p[0] for p in pairs]
+            self.masks_fps = [p[1] for p in pairs]
 
     def __getitem__(self, idx):
-        image, mask, stem = super().__getitem__(idx)
-        semantic = mask[0]
-        target = masks_to_instances(semantic.numpy().astype(np.uint8), self.min_area, self.max_instances)
-        target["semantic_mask"] = semantic
-        return image, target, stem
+        if self.instances_dir is None:
+            image, mask, stem = super().__getitem__(idx)
+            semantic = mask[0]
+            target = masks_to_instances(semantic.numpy().astype(np.uint8), self.min_area, self.max_instances)
+            target["semantic_mask"] = semantic
+            return image, target, stem
+
+        stem = Path(self.masks_fps[idx]).stem
+        image = cv2.cvtColor(cv2.imread(str(self.images_fps[idx])), cv2.COLOR_BGR2RGB)
+        semantic = cv2.imread(str(self.masks_fps[idx]), cv2.IMREAD_GRAYSCALE)
+        id_map, meta = load_instance_annotation(self.instances_dir, stem)
+        if self.augmentation:  # the id map moves with the image exactly like the semantic mask
+            augmented = self.augmentation(image=image, masks=[semantic, id_map])
+            image, (semantic, id_map) = augmented["image"], augmented["masks"]
+        target = id_map_to_instances(np.asarray(id_map), meta, self.min_area, self.max_instances)
+        target["semantic_mask"] = self._preprocess_mask(np.asarray(semantic))[0]
+        return self._preprocess_image(image), target, stem
 
 
 def collate_instances(batch):
