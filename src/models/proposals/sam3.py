@@ -30,7 +30,8 @@ def load_sam3(checkpoint: str | None = "sam3", device: str = "cuda", resolution:
 
     Args:
         checkpoint: "sam3" downloads facebook/sam3 from Hugging Face (gated:
-            request access, then `hf auth login`); a path loads that sam3.pt;
+            request access, then `hf auth login`); a path loads that sam3.pt, or
+            a mode=sam3_finetune export (its base, then the fine-tuned detector);
             "random" builds the architecture untrained (plumbing tests only).
     """
     try:
@@ -44,8 +45,17 @@ def load_sam3(checkpoint: str | None = "sam3", device: str = "cuda", resolution:
         log.warning("SAM 3 built with random weights (checkpoint=random): proposals are meaningless")
         model = build_sam3_image_model(device=device, load_from_HF=False, compile=compile)
     else:
-        model = build_sam3_image_model(device=device, checkpoint_path=str(checkpoint), load_from_HF=False,
-                                       compile=compile)
+        from src.finetune.sam3_model import apply_delta, read_delta
+
+        delta = read_delta(checkpoint)
+        if delta is not None:  # mode=sam3_finetune's export: its base, plus the fine-tuned detector
+            log.info("SAM 3 fine-tuned checkpoint %s (base %s)", checkpoint, delta["base"])
+            model, _ = load_sam3(delta["base"], "cpu", resolution, confidence_threshold, compile=False)
+            apply_delta(model, delta)
+            model = model.to(device)
+        else:
+            model = build_sam3_image_model(device=device, checkpoint_path=str(checkpoint), load_from_HF=False,
+                                           compile=compile)
     processor = Sam3Processor(model, resolution=resolution, device=device, confidence_threshold=confidence_threshold)
     return model, processor
 

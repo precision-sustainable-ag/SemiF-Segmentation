@@ -33,7 +33,7 @@ class FakeBoxGenerator:
     def __init__(self):
         self.calls = []
 
-    def predict_tiled(self, image, semantic_mask=None, tile_size=1024, overlap=256, merge_iou=0.5):
+    def predict_tiled(self, image, semantic_mask=None, tile_size=1024, overlap=256, merge_iou=0.5, box_from="mask"):
         self.calls.append((image.shape[:2], tile_size, overlap))
         height, width = image.shape[:2]
         return Instances(height, width, boxes=np.array(SCALED_BOXES, np.int64), labels=np.array([1, 2]),

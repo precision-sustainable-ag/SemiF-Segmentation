@@ -35,9 +35,11 @@ tiling:                   # ProposalGenerator.predict_tiled, for images larger t
   tile_size: 1024
   overlap: 256
   merge_iou: 0.5
+  box_from: mask          # mask: a box is its mask's extent | model: the predicted box (use with a detection-fine-tuned checkpoint, mode=sam3_finetune)
 
 full_image:               # preprocess task full_image_boxes (src/preprocessing/full_image_boxes.py)
   scale: ${preprocess.tile.scale}  # full images are downscaled by this (default: the training scale); boxes are written at full resolution
+  max_side: null          # instead of scale: downscale each image until its longest side is this (1008: the whole image as one SAM 3 input)
   splits: [train, val, test]  # manifest splits whose full images (and label masks) are boxed
   image_dir: null         # instead: every *.jpg here (under paths.persistent_dir), without semantic masks
   max_images: null        # for trial runs

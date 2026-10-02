@@ -13,6 +13,7 @@ project_mode_dir: ${paths.project_dir}/${mode}
 project_preprocess_dir: ${paths.project_dir}/preprocess
 project_train_dir: ${paths.project_dir}/train
 project_inference_dir: ${paths.project_dir}/inference
+sam3_finetune_dir: ${paths.project_dir}/sam3_finetune/${sam3_finetune.name}   # mode=sam3_finetune
 
 # Inputs and caches: source DB snapshots, image sets to run inference on
 data_dir: ${paths.persistent_dir}/data

@@ -43,6 +43,14 @@ def to_pil(image) -> Image.Image:
     return Image.fromarray(image)
 
 
+def model_box(bbox, height: int, width: int) -> tuple[int, int, int, int] | None:
+    """A predicted xyxy box as whole pixel edges (outward), clipped to the image; None if empty."""
+    x0, y0, x1, y1 = (float(v) for v in bbox)
+    x0, y0 = max(0, int(np.floor(x0))), max(0, int(np.floor(y0)))
+    x1, y1 = min(width, int(np.ceil(x1))), min(height, int(np.ceil(y1)))
+    return (x0, y0, x1, y1) if x1 > x0 and y1 > y0 else None
+
+
 def to_dict(cfg) -> dict:
     """A plain dict from a DictConfig, dict or None."""
     if cfg is None:
@@ -135,12 +143,17 @@ class ProposalGenerator:
         return (target, result) if return_result else target
 
     def predict_tiled(self, image, semantic_mask=None, tile_size: int = 1024, overlap: int = 256,
-                      merge_iou: float = 0.5):
+                      merge_iou: float = 0.5, box_from: str = "mask"):
         """Full-image proposals for images too large (or dense) for one pass:
         filtered proposals of overlapping tiles, moved to image coordinates and
         merged across tiles as src.inferencing.tiled_instances does for the
         detectors. Returns its Instances (masks as crops of their boxes, labels
-        from prompt_labels), usable with paint_semantic, coco_ap, etc."""
+        from prompt_labels), usable with paint_semantic, coco_ap, etc.
+
+        box_from: "mask", each box is its mask's extent; "model", the box the
+        model predicted (what detection fine-tuning trains, src/finetune)."""
+        if box_from not in ("mask", "model"):
+            raise ValueError(f"box_from must be mask or model, not {box_from!r}")
         from src.inferencing.tiled_instances import Instances, merge_across_tiles, tile_starts
 
         array = np.asarray(to_pil(image))
@@ -153,7 +166,7 @@ class ProposalGenerator:
         for t, (x0, y0, x1, y1) in enumerate(rects):
             crop_sem = None if semantic is None else semantic[y0:y1, x0:x1]
             for p in self.predict(array[y0:y1, x0:x1], crop_sem).proposals:
-                box = mask_box(p.mask)
+                box = mask_box(p.mask) if box_from == "mask" else model_box(p.bbox, y1 - y0, x1 - x0)
                 if box is None:
                     continue
                 bx0, by0, bx1, by1 = box

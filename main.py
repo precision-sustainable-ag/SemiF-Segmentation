@@ -9,6 +9,7 @@ from src.inference import main as inference
 from src.train import main as train
 from src.sync import main as sync
 from src.label import main as label
+from src.sam3_finetune import main as sam3_finetune
 
 
 log = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ TASK_REGISTRY = {
     "preprocess": preprocess,
     "train": train,
     "inference": inference,
+    "sam3_finetune": sam3_finetune,
     # Add more tasks here as needed
 }
 
