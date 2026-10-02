@@ -13,7 +13,7 @@ tasks:
   fetch: true             # move them into the run folder (transfer.backend: globus | copy)
   prepare: true           # downscale for CVAT + model pre-labels
   push_cvat: true         # create the CVAT task (jobs of cvat.segment_size images)
-  pull_cvat: true         # read finished jobs back as masks
+  pull_cvat: true         # read finished jobs back as masks (or boxes)
 
 retry_errors: false       # also re-run images a task previously marked as error
 
@@ -34,7 +34,12 @@ prepare:
   jpeg_quality: 95
 
 prelabel:
-  enable: true
+  # unet_masks: semantic round, vegetation masks pre-labeled by the UNet below (or existing masks).
+  # sam3_boxes: detection round, one rectangle per plant pre-labeled by SAM 3 (conf/proposals:
+  #   proposals.full_image.scale, proposals.tiling), in the CVAT project cvat.detection.project_name.
+  #   Uploads the downscaled image (prepare.split must be false); the settings below are unet_masks only.
+  kind: unet_masks        # unet_masks | sam3_boxes
+  enable: true            # false: start empty in CVAT
   # model: run the checkpoint below. masks: use existing masks laid out like
   # AgIR-CVToolkit's, <masks_root>/<batch>/segmentations/<image_id>.png, where
   # <batch> is the folder above images/ in the source DB path; any nonzero
@@ -59,5 +64,10 @@ prelabel:
   device: cuda
   cuda_visible_devices: []  # e.g. [9]; empty leaves CUDA_VISIBLE_DEVICES alone
 
+push_cvat:
+  max_images: null        # push at most this many prepared images (by image id); the rest wait for a later run
+  image_ids: []           # push only these prepared images (empty: all)
+
 pull_cvat:
   refresh: false          # also re-pull labeled/excluded images (after reopening a job)
+  match_iou: 0.5          # sam3_boxes: an edited box is sam3_corrected if it overlaps a pre-label this much, else human

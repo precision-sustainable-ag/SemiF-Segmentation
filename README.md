@@ -111,7 +111,8 @@ outputs/runs/<project.name>/
     ├── field-batches/... or semifield-developed-images/...   # fetch: full-resolution images, laid out as on the source storage
     ├── images/<image_id>.jpg          # prepare: the downscaled copies uploaded to CVAT
     ├── masks/<image_id>.png           # prepare: model pre-labels (0/255)
-    ├── cvat_downloads/<task name>/    # pull_cvat: annotations/job_<id>.json and masks/<image_id>.png
+    ├── boxes/<image_id>.json          # prepare, box rounds: SAM 3 boxes uploaded as rectangles
+    ├── cvat_downloads/<task name>/    # pull_cvat: annotations/job_<id>.json and masks/<image_id>.png (box rounds: boxes/<image_id>.json)
     ├── manifest.csv                   # one row per image: status, paths, CVAT task/job/frame
     └── metrics.json                   # status counts and each task's latest summary
 ```
@@ -120,6 +121,23 @@ Human masks are 0/1 PNGs at the resolution they were annotated in CVAT
 (`cvat_downloads/<task name>/masks/`); `tile` scales them to each image. They
 aren't copied anywhere else, so keep the CVAT tasks: `pull_cvat` can always
 re-export them (`label.pull_cvat.refresh=true`).
+
+### Box rounds
+
+With `label.prelabel.kind=sam3_boxes` a round labels plant boxes instead of
+masks. `prepare` uploads each image downscaled to `max_side` (never tiles) and
+pre-labels it with SAM 3 boxes, computed as the preprocess task
+`full_image_boxes` does (downscale by `proposals.full_image.scale`, predict on
+`proposals.tiling` tiles, merge), into `boxes/<image_id>.json`. `push_cvat`
+puts the task in its own CVAT project, `cvat.detection.project_name`, with one
+rectangle label per detection class (`cvat.detection.labels`) and the
+`exclude` tag, and uploads one rectangle per plant for annotators to fix, add
+or delete. `pull_cvat` writes `cvat_downloads/<task name>/boxes/<image_id>.json`:
+the corrected boxes at full resolution (xyxy pixel edges) with their label,
+and each box's provenance from comparing it with the uploaded pre-labels:
+`sam3` (unchanged), `sam3_corrected` (edited; IoU of at least
+`label.pull_cvat.match_iou` with a pre-label) or `human` (added). The ledger's
+`boxes_path` points to it.
 
 ## Training
 

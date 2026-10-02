@@ -1,0 +1,43 @@
+# @package _global_
+# Plant and colorchecker boxes for the AgIR v2 sample of 300 images: SAM 3 pre-labels, corrected
+# as CVAT rectangles in the project cvat.detection.project_name (semif_plant_boxes).
+# Its own project (ledger and run folder), since the same images are in
+# vegetation_001's mask round; config.yaml's project block wins over this file,
+# so the project name goes on the command line:
+#   python main.py mode=label label=r001_agir_v2_sample300_boxes project.name=plant_boxes_001
+defaults:
+  - default@label
+  - _self_
+
+label:
+  round: r001_agir_v2_sample300_boxes
+  source: semif
+  select:
+    n_images: 300           # every image in agir_v2_sample300.db
+    balance_by: []
+  prepare:
+    split: false            # box rounds upload the downscaled image
+  prelabel:
+    kind: sam3_boxes
+    cuda_visible_devices: [0]
+
+proposals:                  # SAM 3 prompts -> detection class (cvat.detection.labels: 1 plant, 2 colorchecker)
+  prompts: [plant, grass, color chart]   # "color chart" finds each colorchecker panel; "color calibration card" also hits the marker cards
+  prompt_labels: {color chart: 2}        # plant and grass: pseudo_labels.default_label (1)
+
+sources:
+  semif:
+    db: ${paths.persistent_dir}/outputs/source_db/agir_v2_sample300.db   # built from agir_v2_sample300.csv
+    snapshot: "off"
+    roots:
+      - name: agir_v2_sample300
+        local_path: /mnt/globus/MK_test/agir_v2_sample300
+        endpoint: null
+        endpoint_path: null
+
+transfer:
+  backend: copy
+
+cvat:
+  task_size: 10             # images per task: 30 tasks
+  segment_size: 10          # images per job: one job per task

@@ -8,8 +8,8 @@ defaults:
   - sources: default        # Source DBs for labeling rounds (AgIR v2, field_exploration)
   - transfer: default       # How label fetch moves images (Globus endpoints and paths)
   - cvat: default           # CVAT server, organization, and project
-  - label: default          # Labeling round (select one with label=<round>)
   - proposals: sam3         # pseudo-instance teacher (optional; preprocess tasks pseudo_instances, full_image_boxes)
+  - label: default          # Labeling round (select one with label=<round>); after proposals, so a round can set its SAM 3 prompts
 
   - _self_                   # Ensures overriding behavior
 

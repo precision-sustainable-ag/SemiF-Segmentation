@@ -11,16 +11,24 @@ wrote images/ and masks/ for its CVAT upload. The ledger's `tiles` table records
 where each frame sits in the full image, so pull_cvat can put the masks back
 together. With `label.prelabel.source=masks` the pre-label is taken from an
 existing mask instead of the model (see `existing_mask_path`).
+
+Box rounds (`label.prelabel.kind=sam3_boxes`) upload the downscaled image, never
+tiles, and pre-label it with SAM 3 plant boxes (src/labeling/prelabel_boxes.py)
+written to boxes/<image_id>.json: per box its full-resolution `bbox`, the
+`bbox_cvat` uploaded as a CVAT rectangle, its label and score.
 """
 
+import json
 import logging
 import math
+from datetime import datetime
 from pathlib import Path
 
 import cv2
 from omegaconf import DictConfig
 from tqdm import tqdm
 
+from src.labeling.cvat_boxes import is_box_round, scale_box
 from src.labeling.ledger import LabelLedger
 from src.labeling.run_folder import RunFolder
 
@@ -38,6 +46,8 @@ def main(cfg: DictConfig) -> dict | None:
         if not items:
             log.info("No fetched images waiting to be prepared in round %s.", lcfg.round)
             return None
+        if is_box_round(lcfg):
+            return prepare_boxes(cfg, ledger, items, run)
 
         pcfg = lcfg.prelabel
         use_masks = pcfg.enable and pcfg.source == "masks"
@@ -132,6 +142,70 @@ def main(cfg: DictConfig) -> dict | None:
                 log.exception("prepare failed for %s", image_id)
                 ledger.update(source, image_id, status="error", error=f"prepare: {exc}")
                 counts["errors"] += 1
+    return counts
+
+
+def prepare_boxes(cfg: DictConfig, ledger: LabelLedger, items: list[dict], run: RunFolder) -> dict:
+    """Box rounds: images/<image_id>.jpg downscaled to max_side, and with
+    label.prelabel.enable its SAM 3 boxes in boxes/<image_id>.json."""
+    lcfg = cfg.label
+    source = lcfg.source
+    if lcfg.prepare.split:
+        raise ValueError("label.prelabel.kind=sam3_boxes uploads whole downscaled images; set label.prepare.split=false")
+    enable = bool(lcfg.prelabel.enable)
+    if enable:
+        run.boxes.mkdir(parents=True, exist_ok=True)
+    prelabeler = None
+    max_side = int(lcfg.prepare.max_side)
+    quality = int(lcfg.prepare.jpeg_quality)
+    counts = {"prepared": 0, "frames": 0, "prelabeled": 0, "boxes": 0, "errors": 0}
+    for item in tqdm(items, desc="prepare (boxes)"):
+        image_id = item["image_id"]
+        try:
+            image = cv2.imread(item["native_path"], cv2.IMREAD_COLOR)
+            if image is None:
+                raise RuntimeError(f"could not read {item['native_path']}")
+            height, width = image.shape[:2]
+            scale = min(1.0, max_side / max(height, width))
+            size = (max(1, round(width * scale)), max(1, round(height * scale)))
+            canvas = cv2.resize(image, size, interpolation=cv2.INTER_AREA) if scale < 1.0 else image
+            cvat_path = run.images / f"{image_id}.jpg"
+            if not cv2.imwrite(str(cvat_path), canvas, [cv2.IMWRITE_JPEG_QUALITY, quality]):
+                raise RuntimeError(f"could not write {cvat_path}")
+            tile = {"name": image_id, "x": 0, "y": 0, "width": width, "height": height,
+                    "cvat_width": size[0], "cvat_height": size[1], "cvat_image_path": str(cvat_path)}
+
+            if enable:
+                if prelabeler is None:
+                    from src.labeling.prelabel_boxes import BoxPrelabeler  # torch/SAM 3 only when needed
+
+                    prelabeler = BoxPrelabeler(cfg)
+                sx, sy = size[0] / width, size[1] / height
+                boxes = [{**box, "bbox_cvat": scale_box(box["bbox"], sx, sy), "source": "sam3"}
+                         for box in prelabeler.predict(image)]
+                prelabel_path = run.boxes / f"{image_id}.json"
+                prelabel_path.write_text(json.dumps({
+                    "image_id": image_id, "image_size": [height, width], "cvat_size": [size[1], size[0]],
+                    "created": datetime.now().isoformat(timespec="seconds"),
+                    "provenance": prelabeler.provenance, "instances": boxes,
+                }, indent=1))
+                tile["prelabel_path"] = str(prelabel_path)
+                counts["prelabeled"] += 1
+                counts["boxes"] += len(boxes)
+
+            ledger.set_tiles(source, image_id, [tile])
+            ledger.update(
+                source, image_id, status="prepared", error=None,
+                native_width=width, native_height=height, scale=scale,
+                cvat_image_path=tile["cvat_image_path"], prelabel_path=tile.get("prelabel_path"),
+                cvat_width=size[0], cvat_height=size[1],
+            )
+            counts["prepared"] += 1
+            counts["frames"] += 1
+        except Exception as exc:
+            log.exception("prepare failed for %s", image_id)
+            ledger.update(source, image_id, status="error", error=f"prepare: {exc}")
+            counts["errors"] += 1
     return counts
 
 
