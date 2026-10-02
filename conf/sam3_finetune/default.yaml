@@ -1,0 +1,64 @@
+# Fine-tune SAM 3's detector on this project's labels and compare it with zero-shot SAM 3
+# (src/sam3_finetune.py). Box rounds (label.prelabel.kind=sam3_boxes):
+#   python main.py mode=sam3_finetune project.name=plant_boxes_001 sam3_finetune.name=v1
+# Semantic rounds (plant boxes from the vegetation masks' blobs):
+#   python main.py mode=sam3_finetune project.name=vegetation_001 sam3_finetune.labels=masks sam3_finetune.name=masks_v1
+# Writes outputs/runs/<project.name>/sam3_finetune/<name>/. Needs `uv sync --extra sam3`.
+name: v1
+
+tasks:
+  dataset: true             # dataset/: tiled COCO train/valid sets from the pulled boxes
+  train: true               # train/: sam3.train on dataset/train (delete train/ to start over; it resumes otherwise)
+  export: true              # sam3_finetuned.pt (+ sam3_finetuned_e<N>.pt per snapshot): use as proposals.checkpoint, with proposals.tiling.box_from=model
+  evaluate: true            # eval.json, detections/, previews/: zero-shot vs fine-tuned on dataset/valid
+
+labels: boxes               # boxes: box rounds' pulled boxes | masks: semantic rounds' pulled masks, one plant box per blob
+rounds: []                  # rounds of this project to use (empty: every round with pulled labels of that kind)
+prompts:                    # CVAT label -> the SAM 3 prompt it's detected with (keep the rounds' proposals.prompts)
+  plant: plant
+  colorchecker: color chart
+cuda_visible_devices: []    # e.g. [0]; empty leaves CUDA_VISIBLE_DEVICES alone
+
+masks:                      # labels=masks: plant boxes from the vegetation masks (sizes in full-resolution px)
+  label: plant              # the sam3_finetune.prompts entry they're trained as (the only category)
+  merge_px: 12              # mask pixels this close are one plant (joins leaf fragments)
+  absorb_contained: 0.9     # a blob whose box is this much inside a bigger blob's box joins that plant (0: off)
+  min_area_px: 4000         # blobs with fewer mask pixels are dropped (specks, stray pixels; ~60 x 60)
+
+dataset:
+  val_fraction: 0.15        # share of images held out for evaluate; assigned once per image (dataset/split.json)
+  seed: 42
+  max_side: 1008            # each image whole, downscaled until its longest side is this (SAM 3's input size);
+                            # pre-label with proposals.full_image.max_side=1008 to match. null: tiles, as below
+  scale: ${proposals.full_image.scale}      # max_side null: images downscaled by this,
+  tile_size: ${proposals.tiling.tile_size}  # then cut into overlapping tiles
+  overlap: ${proposals.tiling.overlap}
+  min_visible: 0.5          # tiles: a box cut by a tile edge is kept (clipped) if this share of it is in the tile
+  min_box_px: 4             # ... and it's at least this wide and high (working-scale px)
+  jpeg_quality: 95
+
+train:                      # sam3's box-only fine-tuning recipe (src/finetune/sam3_trainer.py)
+  checkpoint: ${proposals.checkpoint}  # starting weights: sam3 (facebook/sam3) or a sam3.pt
+  freeze: ["backbone.*"]    # unix patterns of parameters kept at SAM 3's values: vision + text encoders
+  epochs: 20                # passes over the training images (sam3's recipe: 20); with tiles, ~20 inputs per image: use fewer
+  snapshots: []             # also keep these epochs (e.g. [10, 20, 40]); evaluate compares them all and links the best
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  lr: 8.0e-5                # transformer and heads (sam3's recipe: 8e-4 x lr_scale 0.1)
+  backbone_lr_factor: 0.3125  # backbone parameters train at lr x this, if not frozen (2.5e-4 / 8e-4)
+  weight_decay: 0.1
+  warmup: 20                # steps of the inverse-square-root schedule: lr x sqrt(timescale / step) after warmup,
+                            # linearly to 0 over the last cooldown steps (sam3's recipe, for ~2k steps; raise timescale for longer runs)
+  cooldown: 20
+  timescale: 20
+  resolution: 1008          # SAM 3's input size; tiles are randomly resized (min_resize..resolution) and padded
+  min_resize: 480
+  max_ann_per_img: 200      # queries (tile x category) with more boxes are skipped
+  num_workers: 4
+  log_freq: 10
+  seed: 123
+
+evaluate:
+  score_threshold: 0.05     # detections kept for AP; precision/recall use proposals.score_threshold
+  previews: 8               # previews/<image>.jpg: ground truth | zero-shot | fine-tuned (the best), for this many valid images
+  select_by: AP             # AP | AP50 | AP75: how the best snapshot is chosen (sam3_finetuned_best.pt)

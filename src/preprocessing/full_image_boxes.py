@@ -1,6 +1,8 @@
 """Plant bounding boxes for whole images (preprocess task full_image_boxes).
 
-Each full-size image (~9500 x 13400 px) is downscaled by proposals.full_image.scale,
+Each full-size image (~9500 x 13400 px) is downscaled by proposals.full_image.scale
+(or, with proposals.full_image.max_side, until its longest side is max_side: the
+whole image in one SAM 3 input when max_side <= proposals.tiling.tile_size),
 its SAM 3 proposals (conf/proposals) are predicted on overlapping tiles and
 merged across tiles (ProposalGenerator.predict_tiled), filtered against the
 image's semantic mask and clipped to it (as for pseudo-instances), and the
@@ -59,12 +61,23 @@ def image_rows(cfg: DictConfig, fcfg: dict) -> list[dict]:
     return rows[["image_id", "split", "image_path", "mask_path"]].to_dict("records")
 
 
-def load_scaled(image_path, mask_path, scale: float):
-    """(full (H, W), RGB image at scale, label mask at scale or None)."""
+def working_scale(full_hw: tuple[int, int], fcfg: dict) -> float:
+    """The factor full images are downscaled by: max_side / longest side when
+    full_image.max_side is set (never upscaling), else full_image.scale."""
+    if fcfg.get("max_side"):
+        return min(1.0, float(fcfg["max_side"]) / max(full_hw))
+    return float(fcfg["scale"])
+
+
+def load_scaled(image_path, mask_path, scale: float | dict):
+    """(full (H, W), RGB image at scale, label mask at scale or None); scale
+    may be the full_image config (working_scale)."""
     image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
     if image is None:
         raise FileNotFoundError(image_path)
     full_hw = image.shape[:2]
+    if isinstance(scale, dict):
+        scale = working_scale(full_hw, scale)
     size = (max(1, round(full_hw[1] * scale)), max(1, round(full_hw[0] * scale)))
     image = cv2.cvtColor(cv2.resize(image, size, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
     mask = None
@@ -94,7 +107,8 @@ def predict_instances(generator, image: np.ndarray, semantic, full_hw: tuple[int
     mask or None), best first: bbox at full resolution full_hw, bbox_scaled,
     score, label, area_scaled."""
     tcfg = scfg["tiling"]
-    inst = generator.predict_tiled(image, semantic, tcfg["tile_size"], tcfg["overlap"], tcfg["merge_iou"])
+    inst = generator.predict_tiled(image, semantic, tcfg["tile_size"], tcfg["overlap"], tcfg["merge_iou"],
+                                   tcfg.get("box_from", "mask"))
     if semantic is not None and scfg["pseudo_labels"].get("clip_to_semantic", True):
         inst = clip_instances_to_semantic(inst, semantic, scfg["filtering"].get("ignore_value"),
                                           scfg["filtering"].get("min_area", 0))
@@ -113,8 +127,8 @@ def predict_instances(generator, image: np.ndarray, semantic, full_hw: tuple[int
 
 def box_image(generator, row: dict, scfg: dict) -> tuple[dict, np.ndarray]:
     """(JSON record of one image's instances, the image at the working scale)."""
-    scale = float(scfg["full_image"]["scale"])
-    full_hw, image, semantic = load_scaled(row["image_path"], row["mask_path"], scale)
+    full_hw, image, semantic = load_scaled(row["image_path"], row["mask_path"], scfg["full_image"])
+    scale = image.shape[1] / full_hw[1]
     instances = predict_instances(generator, image, semantic, full_hw, scfg)
     return {
         "image_id": row["image_id"],
@@ -122,7 +136,7 @@ def box_image(generator, row: dict, scfg: dict) -> tuple[dict, np.ndarray]:
         "image_path": str(row["image_path"]),
         "mask_path": None if row["mask_path"] is None else str(row["mask_path"]),
         "image_size": list(full_hw),
-        "scale": scale,
+        "scale": round(scale, 6),
         "scaled_size": list(image.shape[:2]),
         "annotation_source": generator.source.value,
         "instances": instances,
@@ -135,7 +149,7 @@ def main(cfg: DictConfig) -> None:
     rows = image_rows(cfg, fcfg)
     if fcfg.get("max_images"):
         rows = rows[: int(fcfg["max_images"])]
-    out_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "full_image_boxes" / f"{scfg['name']}_scale{fcfg['scale']}"
+    out_dir = Path(cfg.paths.project_preprocess_dir) / "data" / "full_image_boxes" / (f"{scfg['name']}_maxside{fcfg['max_side']}" if fcfg.get("max_side") else f"{scfg['name']}_scale{fcfg['scale']}")
     out_dir.mkdir(parents=True, exist_ok=True)
     generator = build_proposal_generator(scfg["name"], scfg)
     provenance = {
@@ -146,7 +160,8 @@ def main(cfg: DictConfig) -> None:
         "tiling": scfg["tiling"],
         "filtering": scfg["filtering"],
     }
-    log.info("Boxing %d full images at scale %s with %s -> %s", len(rows), fcfg["scale"], scfg["name"], out_dir)
+    log.info("Boxing %d full images at %s with %s -> %s", len(rows),
+             f"max side {fcfg['max_side']}" if fcfg.get("max_side") else f"scale {fcfg['scale']}", scfg["name"], out_dir)
     previews = 0
     for row in tqdm(rows, desc=f"{scfg['name']} full images"):
         json_path = out_dir / f"{row['image_id']}.json"

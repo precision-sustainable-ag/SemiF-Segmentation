@@ -245,6 +245,43 @@ SAM 3 works on 1008 x 1008 inputs and returns at most 200 instances per
 prompt, so keep tiles near 1024 px (as `preprocess.tile.tile_size` does), and
 use `predict_tiled` for whole images.
 
+### Fine-tuning SAM 3's detector (`mode=sam3_finetune`)
+
+Trains SAM 3 on the project's corrected labels and checks it against zero-shot
+SAM 3 ([src/sam3_finetune.py](src/sam3_finetune.py), [conf/sam3_finetune](conf/sam3_finetune/default.yaml)):
+
+```bash
+# box rounds (label.prelabel.kind=sam3_boxes): the pulled boxes
+python main.py mode=sam3_finetune project.name=plant_boxes_001 sam3_finetune.name=v1
+# semantic rounds: one plant box per blob of the pulled vegetation masks (plant only)
+python main.py mode=sam3_finetune project.name=vegetation_001 sam3_finetune.labels=masks sam3_finetune.name=masks_v1
+```
+
+Only the detector is trained: the vision and text encoders stay frozen
+(`train.freeze`), and there is no mask head or mask loss (sam3's own box-only
+fine-tuning recipe, run with sam3.train's Trainer on one GPU). Tasks, in
+`outputs/runs/<project.name>/sam3_finetune/<name>/`:
+
+| Task | Writes |
+|---|---|
+| `dataset` | `dataset/{train,valid}/`: images downscaled by `proposals.full_image.scale` and cut into `proposals.tiling` tiles, as pre-labeling sees them, in COCO (category = the SAM 3 prompt); the split is kept per image in `split.json` |
+| `train` | `train/checkpoints/checkpoint.pt` (trained weights only), `train/tensorboard/`; delete `train/` to start over, it resumes otherwise |
+| `export` | `sam3_finetuned.pt` (~0.4 GB): the trained detector weights and the checkpoint they apply to; loading it rebuilds that checkpoint (mask head included) and puts them in |
+| `evaluate` | `eval.json`: box AP (overall, per class) and precision/recall at `proposals.score_threshold`, zero-shot vs fine-tuned, on `dataset/valid` |
+
+Use the result for pre-labels with
+`proposals.checkpoint=<run>/sam3_finetuned.pt proposals.tiling.box_from=model`:
+`box_from=model` takes SAM 3's predicted boxes (what fine-tuning trains)
+instead of its masks' extents. Masks still come from the original mask head,
+fed by the fine-tuned decoder, so check them before using that checkpoint for
+`pseudo_instances`.
+
+Two workarounds for sam3 at the pinned commit live in
+[src/finetune](src/finetune): its ViT MLPs use an inference-only fused kernel,
+so a frozen vision encoder runs under `no_grad`; and its Triton focal loss
+returns NaN gradients for `gamma=0` (the presence loss) once the model is
+confident, so that loss uses sam3's PyTorch implementation.
+
 ## Where outputs go
 
 Everything a project produces sits in its AgIR-CVToolkit-style folder,
